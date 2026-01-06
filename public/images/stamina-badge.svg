@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
+  <!-- Background circle -->
+  <circle cx="150" cy="150" r="140" fill="#1a1464" stroke="#ffd700" stroke-width="8"/>
+  
+  <!-- Inner ring -->
+  <circle cx="150" cy="150" r="120" fill="none" stroke="#ffd700" stroke-width="2"/>
+  
+  <!-- Banner ribbon at bottom -->
+  <path d="M40 200 Q150 240 260 200 L260 220 Q150 260 40 220 Z" fill="#ffd700"/>
+  
+  <!-- Text: STAMINA -->
+  <text x="150" y="120" text-anchor="middle" fill="#ffd700" font-family="Arial Black, sans-serif" font-size="42" font-weight="bold">STAMINA</text>
+  
+  <!-- Text: FITNESS CENTRE on ribbon -->
+  <text x="150" y="215" text-anchor="middle" fill="#1a1464" font-family="Arial, sans-serif" font-size="18" font-weight="bold">FITNESS CENTRE</text>
+  
+  <!-- Muscular figure silhouette (simplified) -->
+  <g fill="#ffffff" transform="translate(150, 75)">
+    <!-- Head -->
+    <circle cx="0" cy="-15" r="12"/>
+    <!-- Body/Chest -->
+    <path d="M-25 0 Q-30 20 -20 45 L20 45 Q30 20 25 0 Q15 -5 0 -5 Q-15 -5 -25 0"/>
+    <!-- Arms flexing -->
+    <path d="M-25 5 Q-45 -10 -50 5 Q-55 20 -40 25 Q-30 15 -25 20"/>
+    <path d="M25 5 Q45 -10 50 5 Q55 20 40 25 Q30 15 25 20"/>
+  </g>
+</svg>

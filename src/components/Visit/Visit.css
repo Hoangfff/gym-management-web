@@ -1,0 +1,118 @@
+.visit {
+  padding: var(--spacing-4xl) 0;
+  background-color: var(--color-gray-100);
+}
+
+.visit-container {
+  max-width: var(--container-max-width);
+  margin: 0 auto;
+  padding: 0 var(--container-padding);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-3xl);
+  align-items: center;
+}
+
+.visit-map {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  height: 350px;
+}
+
+.visit-map iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.visit-info {
+  padding: var(--spacing-xl);
+}
+
+.visit-title {
+  font-family: var(--font-display), var(--font-primary);
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  color: var(--color-primary);
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  margin-bottom: var(--spacing-xl);
+}
+
+.visit-details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-xl);
+}
+
+.visit-item {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.visit-item-label {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-primary);
+  min-width: 120px;
+}
+
+.visit-item-value {
+  color: var(--color-gray-700);
+}
+
+.visit-item-value a {
+  color: var(--color-accent);
+  transition: color var(--transition-fast);
+}
+
+.visit-item-value a:hover {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+.socials-section {
+  margin-top: var(--spacing-xl);
+}
+
+.socials-title {
+  font-family: var(--font-display), var(--font-primary);
+  font-size: var(--font-size-sm);
+  color: var(--color-primary);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: var(--spacing-md);
+}
+
+.socials-links {
+  display: flex;
+  gap: var(--spacing-md);
+}
+
+.social-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background-color: var(--color-primary);
+  color: var(--color-white);
+  border-radius: 50%;
+  font-size: var(--font-size-lg);
+  transition: all var(--transition-normal);
+}
+
+.social-link:hover {
+  background-color: var(--color-accent);
+  transform: translateY(-3px);
+}
+
+@media (max-width: 768px) {
+  .visit-container {
+    grid-template-columns: 1fr;
+  }
+
+  .visit-map {
+    height: 250px;
+  }
+}

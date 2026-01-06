@@ -1,0 +1,15 @@
+/* Placeholder images - replace with actual images */
+
+/* For development, we'll use placeholder backgrounds */
+.hero-background img,
+.about-image img,
+.coach-image,
+.progress-image img {
+  background: linear-gradient(135deg, #e0e0e0 0%, #c0c0c0 100%);
+}
+
+/* Placeholder styling for missing images */
+img[src$=".jpg"]:not([src*="http"]) {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 200px;
+}
