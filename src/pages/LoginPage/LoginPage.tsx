@@ -46,7 +46,7 @@ function LoginPage() {
               </svg>
               Back
             </button>
-            <h1 className="auth-title">Sign-in</h1>
+            <h1 className="auth-title">Sign in</h1>
           </div>
 
           <form className="auth-form" onSubmit={handleSubmit}>
@@ -57,6 +57,7 @@ function LoginPage() {
               value={formData.email}
               onChange={handleInputChange}
               required
+              placeholder="example@gmail.com"
             />
 
             <Input
@@ -67,6 +68,7 @@ function LoginPage() {
               onChange={handleInputChange}
               showPasswordToggle
               required
+              placeholder="********"
             />
 
             <div className="auth-options">

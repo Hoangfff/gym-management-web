@@ -1,7 +1,7 @@
 /* ===== CSS VARIABLES ===== */
 :root {
   /* Colors */
-  --color-primary: #1a1464;
+  --color-primary: #1a1363;
   --color-primary-dark: #0f0b3d;
   --color-secondary: #ffd700;
   --color-accent: #6b5ce7;
@@ -21,6 +21,14 @@
 
   --color-olive: #6b6b47;
   --color-olive-light: #8a8a6b;
+
+  /* Dashboard Colors */
+  --color-dashboard-bg: #ece9e9;
+  --color-dashboard-text: #2b2b2b;
+  --color-dashboard-purple: #6f00d0;
+  --color-dashboard-yellow: #e7b900;
+  --color-dashboard-green: #00d026;
+  --color-dashboard-red: #d00000;
   
   /* Typography */
   --font-primary: 'Poppins', sans-serif;

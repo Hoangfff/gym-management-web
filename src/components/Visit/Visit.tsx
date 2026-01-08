@@ -1,3 +1,4 @@
+import { Facebook, Instagram, MessageCircleMore } from 'lucide-react';
 import { CONTACT_INFO, SOCIAL_LINKS } from '../../utils/constants.ts';
 import './Visit.css';
 
@@ -49,9 +50,9 @@ function Visit() {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  {social.icon === 'facebook' && '📘'}
-                  {social.icon === 'messenger' && '💬'}
-                  {social.icon === 'instagram' && '📷'}
+                  {social.icon === 'facebook' && <Facebook size={20}/>}
+                  {social.icon === 'messenger' && <MessageCircleMore size={20}/>}
+                  {social.icon === 'instagram' && <Instagram size={20} />}
                 </a>
               ))}
             </div>

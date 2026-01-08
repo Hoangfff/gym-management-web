@@ -1,0 +1,45 @@
+.welcome-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: var(--color-white);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-xl) var(--spacing-2xl);
+  box-shadow: var(--shadow-sm);
+}
+
+.welcome-card__content {
+  flex: 1;
+}
+
+.welcome-card__title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-normal);
+  color: var(--color-dashboard-text);
+  margin: 0 0 var(--spacing-sm);
+}
+
+.welcome-card__name {
+  font-weight: var(--font-weight-bold);
+  color: var(--color-primary);
+}
+
+.welcome-card__subtitle {
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-500);
+  margin: 0;
+  max-width: 700px;
+  line-height: 1.5;
+}
+
+.welcome-card__icon {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  background-color: var(--color-primary);
+  color: var(--color-white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}

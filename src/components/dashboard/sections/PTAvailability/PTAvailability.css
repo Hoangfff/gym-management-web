@@ -1,0 +1,187 @@
+.pt-availability {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
+}
+
+.pt-availability__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.pt-availability__title {
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-primary);
+  margin: 0;
+}
+
+.pt-availability__subtitle {
+  color: var(--color-gray-500);
+  margin: var(--spacing-xs) 0 0;
+}
+
+.pt-availability__create-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md) var(--spacing-xl);
+  background-color: var(--color-white);
+  color: var(--color-primary);
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  font-family: var(--font-primary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.pt-availability__create-btn:hover {
+  background-color: var(--color-primary);
+  color: var(--color-white);
+}
+
+.pt-availability__stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacing-lg);
+}
+
+.pt-availability__schedule {
+  background-color: var(--color-white);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-xl);
+}
+
+.pt-availability__schedule-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-dashboard-text);
+  margin: 0 0 var(--spacing-xl);
+}
+
+.pt-availability__day {
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-md);
+}
+
+.pt-availability__day:last-child {
+  margin-bottom: 0;
+}
+
+.pt-availability__day-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-md);
+}
+
+.pt-availability__day-name {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-dashboard-text);
+}
+
+.pt-availability__day-count {
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-500);
+}
+
+.pt-availability__day-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.pt-availability__slot-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background-color: #e6f7e6;
+  border: 1px solid #00d026;
+  border-radius: var(--radius-lg);
+}
+
+.pt-availability__slot-chip svg {
+  color: var(--color-dashboard-green);
+}
+
+.pt-availability__slot-name {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-dashboard-green);
+}
+
+.pt-availability__slot-time {
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-600);
+}
+
+.pt-availability__slot-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-gray-500);
+  transition: color var(--transition-fast);
+}
+
+.pt-availability__slot-remove:hover {
+  color: var(--color-dashboard-red);
+}
+
+.pt-availability__no-slot {
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-400);
+  font-style: italic;
+}
+
+/* Days Grid in Modal */
+.days-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.day-btn {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  background-color: var(--color-white);
+  border: 1px solid var(--color-gray-300);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-primary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.day-btn:hover {
+  border-color: var(--color-primary);
+}
+
+.day-btn--selected {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-white);
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .pt-availability__stats {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .pt-availability__header {
+    flex-direction: column;
+    gap: var(--spacing-md);
+  }
+}

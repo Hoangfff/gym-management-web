@@ -1,0 +1,70 @@
+.sales-chart {
+  background-color: var(--color-white);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.sales-chart__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-md);
+}
+
+.sales-chart__title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-dashboard-text);
+  margin: 0;
+}
+
+.sales-chart__more-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-gray-500);
+  padding: var(--spacing-xs);
+  border-radius: var(--radius-sm);
+  transition: background-color var(--transition-fast);
+}
+
+.sales-chart__more-btn:hover {
+  background-color: var(--color-gray-100);
+}
+
+.sales-chart__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.sales-chart__svg {
+  width: 120px;
+  height: 120px;
+  transform: rotate(-90deg);
+}
+
+.sales-chart__bg-circle {
+  stroke: var(--color-gray-200);
+}
+
+.sales-chart__progress-circle {
+  stroke: var(--color-primary);
+  transition: stroke-dashoffset 0.5s ease;
+}
+
+.sales-chart__percentage {
+  font-size: 18px;
+  font-weight: var(--font-weight-bold);
+  fill: var(--color-primary);
+  transform: rotate(90deg);
+  transform-origin: center;
+}
+
+.sales-chart__label {
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-500);
+  margin: var(--spacing-md) 0 0;
+  text-align: center;
+}

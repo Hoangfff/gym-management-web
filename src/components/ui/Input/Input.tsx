@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { InputHTMLAttributes, ReactNode } from 'react';
 import './Input.css';
+import { Eye, EyeClosed, EyeOff } from 'lucide-react';
 
 interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> {
   label?: string;
@@ -8,6 +9,7 @@ interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'>
   required?: boolean;
   icon?: ReactNode;
   showPasswordToggle?: boolean;
+  placeholder?: string;
 }
 
 function Input({
@@ -49,7 +51,7 @@ function Input({
             onClick={() => setShowPassword(!showPassword)}
             tabIndex={-1}
           >
-            {showPassword ? '👁️' : '👁️‍🗨️'}
+            {showPassword ? <Eye size={20}/> : <EyeOff size={20}/>}
           </button>
         )}
         {icon && !showPasswordToggle && <span className="input-icon">{icon}</span>}

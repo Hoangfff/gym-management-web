@@ -48,13 +48,14 @@
 
 .visit-item {
   display: flex;
-  gap: var(--spacing-sm);
+  gap: var(--spacing-4xl);
 }
 
 .visit-item-label {
   font-weight: var(--font-weight-semibold);
   color: var(--color-primary);
-  min-width: 120px;
+  width: 144px;
+  min-width: 144px;
 }
 
 .visit-item-value {

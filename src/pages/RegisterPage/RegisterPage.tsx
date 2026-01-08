@@ -79,6 +79,7 @@ function RegisterPage() {
                 value={formData.email}
                 onChange={handleInputChange}
                 required
+                placeholder="example@gmail.com"
               />
 
               <Input
@@ -88,6 +89,7 @@ function RegisterPage() {
                 value={formData.fullName}
                 onChange={handleInputChange}
                 required
+                placeholder="John Doe"
               />
             </div>
 
@@ -129,6 +131,7 @@ function RegisterPage() {
                 onChange={handleInputChange}
                 showPasswordToggle
                 required
+                placeholder="********"
               />
 
               <Input
@@ -139,6 +142,7 @@ function RegisterPage() {
                 onChange={handleInputChange}
                 showPasswordToggle
                 required
+                placeholder="********"
               />
             </div>
 
