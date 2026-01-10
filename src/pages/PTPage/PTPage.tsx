@@ -10,7 +10,11 @@ import {
   ServicePackages,
   Bookings,
   Contracts,
-  PTAvailability
+  PTAvailability,
+  Customers,
+  Workouts,
+  Diets,
+  Report
 } from '../../components/dashboard/index.ts';
 import type { ActiveMember } from '../../types/index.ts';
 import './PTPage.css';
@@ -79,6 +83,14 @@ function PTPage() {
         return <Contracts userRole="pt" />;
       case 'slots':
         return <PTAvailability />;
+      case 'members':
+        return <Customers userRole="pt" currentUserId="pt-1" />;
+      case 'workouts':
+        return <Workouts userRole="pt" currentUserId="pt-1" />;
+      case 'diets':
+        return <Diets userRole="pt" currentUserId="pt-1" />;
+      case 'report':
+        return <Report />;
       default:
         return (
           <div className="pt-placeholder">

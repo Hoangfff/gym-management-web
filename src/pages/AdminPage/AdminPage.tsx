@@ -12,7 +12,15 @@ import {
   ServicePackages,
   Bookings,
   Contracts,
-  TimeSlots
+  TimeSlots,
+  Customers,
+  PersonalTrainers,
+  Workouts,
+  Diets,
+  AdditionalServices,
+  Payments,
+  Inventory,
+  Report
 } from '../../components/dashboard/index.ts';
 import type { TopCoach, ActiveMember } from '../../types/index.ts';
 import './AdminPage.css';
@@ -88,6 +96,22 @@ function AdminPage() {
         return <Contracts userRole="admin" />;
       case 'time-slots':
         return <TimeSlots userRole="admin" />;
+      case 'customers':
+        return <Customers userRole="admin" />;
+      case 'personal-trainers':
+        return <PersonalTrainers />;
+      case 'workouts':
+        return <Workouts userRole="admin" />;
+      case 'diets':
+        return <Diets userRole="admin" />;
+      case 'additional-services':
+        return <AdditionalServices onNavigateToPayments={() => setActiveTab('payments')} />;
+      case 'payments':
+        return <Payments />;
+      case 'inventory':
+        return <Inventory />;
+      case 'report':
+        return <Report />;
       default:
         return (
           <div className="admin-placeholder">

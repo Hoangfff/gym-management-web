@@ -45,7 +45,7 @@ const adminMenuItems: SidebarItem[] = [
   { id: 'workouts', label: 'Workouts', icon: Dumbbell },
   { id: 'diets', label: 'Diets', icon: Apple },
   { id: 'additional-services', label: 'Additional Services', icon: Sparkles },
-  { id: 'payment', label: 'Payment', icon: CreditCard },
+  { id: 'payments', label: 'Payments', icon: CreditCard },
   { id: 'inventory', label: 'Inventory', icon: BoxIcon },
   { id: 'report', label: 'Report', icon: BarChart3 },
 ];

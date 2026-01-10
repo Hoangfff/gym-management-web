@@ -188,3 +188,180 @@ export interface PTAvailability {
   fromDate: string;
   toDate?: string;
 }
+
+// ===== Member/Customer Types =====
+
+export type MemberStatus = 'active' | 'no-contract' | 'expired';
+export type Gender = 'male' | 'female' | 'other';
+
+export interface Member {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  dateOfBirth: string;
+  gender: Gender;
+  cccd: string;
+  avatar?: string;
+  dateJoined: string;
+  dateExpiration?: string;
+  status: MemberStatus;
+  contractId?: string;
+  trainerId?: string;
+}
+
+// ===== Personal Trainer Types =====
+
+export type TrainerStatus = 'active' | 'on-leave' | 'pending';
+
+export interface PersonalTrainer {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  dateOfBirth: string;
+  gender: Gender;
+  cccd: string;
+  avatar?: string;
+  about: string;
+  specialization: string[];
+  certifications: string;
+  yearsOfExperience: number;
+  rating: number;
+  activeClients: number;
+  status: TrainerStatus;
+}
+
+// ===== Workout Types =====
+
+export type WorkoutDifficulty = 'beginner' | 'intermediate' | 'advanced';
+export type EquipmentType = 'none' | 'cardio' | 'free-weights' | 'strength';
+
+export interface Workout {
+  id: string;
+  name: string;
+  description: string;
+  duration: number; // minutes
+  difficulty: WorkoutDifficulty;
+  equipment: EquipmentType;
+  calories: number;
+  images?: string[];
+  createdBy: string;
+  createdById: string;
+}
+
+// ===== Diet & Nutrition Types =====
+
+export type FoodType = 'protein' | 'carbs' | 'fats' | 'vegetables' | 'fruits' | 'dairy';
+
+export interface FoodItem {
+  id: string;
+  name: string;
+  type: FoodType;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+  note: string;
+  image?: string;
+  createdBy: string;
+  createdById: string;
+}
+
+export interface DietFoodItem {
+  foodId: string;
+  foodName: string;
+  quantity: number;
+  calories: number;
+  mealType: string;
+  prepMethod: string;
+}
+
+export interface DietPlan {
+  id: string;
+  name: string;
+  description: string;
+  memberId: string;
+  memberName: string;
+  foods: DietFoodItem[];
+  totalCalories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+  water: number;
+  note?: string;
+  createdBy: string;
+  createdById: string;
+}
+
+// ===== Additional Services Types =====
+
+export type ServiceCategory = 'wellness' | 'recovery' | 'assessment' | 'other';
+
+export interface AdditionalService {
+  id: string;
+  name: string;
+  description: string;
+  category: ServiceCategory;
+  costPrice: number;
+  sellPrice: number;
+  maxCapacity: number;
+  isActive: boolean;
+  image?: string;
+}
+
+// ===== Payment Types =====
+
+export type PaymentStatus = 'paid' | 'pending' | 'cancelled' | 'refunded';
+export type PaymentItemType = 'service-package' | 'additional-service' | 'contract' | 'pt-session' | 'other';
+
+export interface PaymentItem {
+  name: string;
+  type: PaymentItemType;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+}
+
+export interface Payment {
+  id: string;
+  memberId: string;
+  memberName: string;
+  memberAvatar?: string;
+  items: PaymentItem[];
+  totalAmount: number;
+  paymentMethod: 'cash' | 'credit-card' | 'transfer';
+  status: PaymentStatus;
+  createdAt: string;
+  processedAt?: string;
+}
+
+// ===== Inventory Types =====
+
+export type InventoryStatus = 'in-stock' | 'in-use' | 'maintenance';
+export type InventoryCategory = 'cardio' | 'free-weights' | 'strength' | 'accessories';
+
+export interface InventoryItem {
+  id: string;
+  name: string;
+  description: string;
+  category: InventoryCategory;
+  status: InventoryStatus;
+  purchaseDate: string;
+  purchasePrice: number;
+  currentValue: number;
+  location: string;
+  quantity: number;
+  maintenanceNotes?: string;
+  image?: string;
+}
+
+// ===== Report Types =====
+
+export interface PackageBreakdown {
+  packageName: string;
+  memberCount: number;
+  percentage: number;
+  revenue: number;
+  color: string;
+}
