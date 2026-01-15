@@ -76,7 +76,7 @@ function PTPage() {
           </div>
         );
       case 'service-packages':
-        return <ServicePackages userRole="pt" currentUserId="pt-1" />;
+        return <ServicePackages userRole="pt" />;
       case 'bookings':
         return <Bookings userRole="pt" />;
       case 'contracts':

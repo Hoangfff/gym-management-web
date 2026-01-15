@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { InputHTMLAttributes, ReactNode } from 'react';
 import './Input.css';
-import { Eye, EyeClosed, EyeOff } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 
 interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> {
   label?: string;

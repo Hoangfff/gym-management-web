@@ -1,164 +1,349 @@
-import { useState } from 'react';
-import { Plus, Search, ChevronDown, Pencil, Trash2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Pencil, Trash2, RefreshCw, Power, PowerOff, Eye, Search } from 'lucide-react';
 import Modal from '../../Modal/index.ts';
-import type { ServicePackage, PackageType } from '../../../../types/index.ts';
+import { ConfirmModal, useToast } from '../../../ui/index.ts';
+import { packageApi } from '../../../../services/index.ts';
+import type { ApiServicePackage, ReqCreatePackageDTO, ReqUpdatePackageDTO, PackageTypeEnum } from '../../../../types/api.ts';
+import { PackageType } from '../../../../types/api.ts';
 import './ServicePackages.css';
 
 interface ServicePackagesProps {
   userRole: 'admin' | 'pt';
-  currentUserId?: string;
 }
 
-// Mock data
-const mockPackages: ServicePackage[] = [
-  {
-    id: 'PKG0001',
-    name: 'Starter Pack',
-    description: 'Access to gym facilities and basic equipment',
-    type: 'no-pt',
-    duration: 30,
-    sessions: 'unlimited',
-    price: 50,
-    isActive: true,
-    createdBy: 'Administrator',
-    createdById: 'admin-1'
-  },
-  {
-    id: 'PKG0002',
-    name: 'Premium Pack',
-    description: 'Access to experienced personal trainers',
-    type: 'pt',
-    duration: 30,
-    sessions: 8,
-    price: 120,
-    isActive: true,
-    createdBy: 'Administrator',
-    createdById: 'admin-1'
-  },
-  {
-    id: 'PKG0003',
-    name: 'VIP Pack',
-    description: '48 PT sessions + High-quality amenities + nutrition plan',
-    type: 'pt',
-    duration: 180,
-    sessions: 48,
-    price: 250,
-    isActive: true,
-    createdBy: 'John Nguyen',
-    createdById: 'pt-1'
-  },
-  {
-    id: 'PKG0004',
-    name: 'Elite Pack',
-    description: 'Unlimited PT sessions + Top notch coaching',
-    type: 'pt',
-    duration: 365,
-    sessions: 'unlimited',
-    price: 500,
-    isActive: true,
-    createdBy: 'Juan Delacruz',
-    createdById: 'pt-2'
-  }
-];
-
-const initialFormData = {
-  name: '',
-  description: '',
-  type: 'no-pt' as PackageType,
-  duration: 0,
-  sessions: 0,
-  price: 0,
-  isActive: true
+// Helper functions
+const formatCurrency = (value: number): string => {
+  return new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency: 'VND'
+  }).format(value);
 };
 
-function ServicePackages({ userRole, currentUserId = 'admin-1' }: ServicePackagesProps) {
-  const [packages, setPackages] = useState<ServicePackage[]>(mockPackages);
+const formatDate = (dateString: string): string => {
+  return new Date(dateString).toLocaleDateString('vi-VN');
+};
+
+const getPackageTypeLabel = (type: PackageTypeEnum): string => {
+  switch (type) {
+    case PackageType.PT_INCLUDED:
+      return 'PT Included';
+    case PackageType.NO_PT:
+      return 'No PT';
+    default:
+      return type;
+  }
+};
+
+function ServicePackages({ userRole }: ServicePackagesProps) {
+  void userRole; // Reserved for future role-based features
+  const { showToast } = useToast();
+
+  // Data state
+  const [packages, setPackages] = useState<ApiServicePackage[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
-  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'price'>('newest');
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [filterType, setFilterType] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+
+  // Modal state
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editingPackage, setEditingPackage] = useState<ServicePackage | null>(null);
-  const [formData, setFormData] = useState(initialFormData);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [editingPackage, setEditingPackage] = useState<ApiServicePackage | null>(null);
+  const [selectedPackage, setSelectedPackage] = useState<ApiServicePackage | null>(null);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    packageName: '',
+    description: '',
+    price: '',
+    durationInDays: '',
+    type: PackageType.NO_PT as PackageTypeEnum,
+    numberOfSessions: '',
+    isActive: true
+  });
+
+  // Fetch packages on mount
+  useEffect(() => {
+    fetchPackages();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const fetchPackages = async () => {
+    setIsLoading(true);
+    try {
+      const response = await packageApi.getAll();
+      setPackages(response.data);
+    } catch (error) {
+      console.error('Failed to fetch packages:', error);
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: 'Không thể tải danh sách gói dịch vụ'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Search packages
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) {
+      fetchPackages();
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await packageApi.searchByName(searchQuery.trim());
+      setPackages(response.data);
+    } catch (error) {
+      console.error('Failed to search packages:', error);
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: 'Không thể tìm kiếm gói dịch vụ'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Filter packages by type
+  const handleFilterByType = async (typeValue: string) => {
+    setFilterType(typeValue);
+    if (typeValue === 'all') {
+      fetchPackages();
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await packageApi.getByType(typeValue as PackageTypeEnum);
+      setPackages(response.data);
+    } catch (error) {
+      console.error('Failed to filter packages:', error);
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: 'Không thể lọc gói dịch vụ'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Stats
   const totalPackages = packages.length;
   const activePackages = packages.filter(p => p.isActive).length;
-  const avgPrice = Math.round(packages.reduce((sum, p) => sum + p.price, 0) / packages.length);
-  const mostPopular = 'Premium'; // This would come from API
+  const ptPackages = packages.filter(p => p.type === PackageType.PT_INCLUDED).length;
+  const totalRevenue = packages.reduce((sum, p) => sum + p.price, 0);
 
-  // Filter packages
+  // Filtered packages for display
   const filteredPackages = packages.filter(pkg => {
-    const matchesSearch = pkg.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         pkg.id.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || 
-                         (statusFilter === 'active' && pkg.isActive) ||
-                         (statusFilter === 'inactive' && !pkg.isActive);
-    return matchesSearch && matchesStatus;
+    if (filterStatus === 'active' && !pkg.isActive) return false;
+    if (filterStatus === 'inactive' && pkg.isActive) return false;
+    return true;
   });
 
-  const canEditPackage = (pkg: ServicePackage) => {
-    if (userRole === 'admin') return true;
-    return pkg.createdById === currentUserId;
-  };
+  const handleAddPackage = async () => {
+    if (!formData.packageName || !formData.price || !formData.durationInDays || !formData.type) {
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: 'Vui lòng điền đầy đủ thông tin bắt buộc'
+      });
+      return;
+    }
 
-  const handleCreatePackage = () => {
-    const newPackage: ServicePackage = {
-      id: `PKG${String(packages.length + 1).padStart(4, '0')}`,
-      name: formData.name,
-      description: formData.description,
-      type: formData.type,
-      duration: formData.duration,
-      sessions: formData.sessions === 0 ? 'unlimited' : formData.sessions,
-      price: formData.price,
-      isActive: formData.isActive,
-      createdBy: userRole === 'admin' ? 'Administrator' : 'Personal Trainer',
-      createdById: currentUserId
-    };
-    setPackages([...packages, newPackage]);
-    setIsCreateModalOpen(false);
-    setFormData(initialFormData);
-  };
+    setIsSubmitting(true);
+    try {
+      const requestData: ReqCreatePackageDTO = {
+        packageName: formData.packageName,
+        description: formData.description,
+        price: parseFloat(formData.price),
+        durationInDays: parseInt(formData.durationInDays),
+        type: formData.type,
+        numberOfSessions: formData.numberOfSessions ? parseInt(formData.numberOfSessions) : 0,
+        isActive: formData.isActive
+      };
 
-  const handleEditPackage = () => {
-    if (!editingPackage) return;
-    setPackages(packages.map(pkg => 
-      pkg.id === editingPackage.id 
-        ? {
-            ...pkg,
-            name: formData.name,
-            description: formData.description,
-            type: formData.type,
-            duration: formData.duration,
-            sessions: formData.sessions === 0 ? 'unlimited' : formData.sessions,
-            price: formData.price,
-            isActive: formData.isActive
-          }
-        : pkg
-    ));
-    setIsEditModalOpen(false);
-    setEditingPackage(null);
-    setFormData(initialFormData);
-  };
+      await packageApi.create(requestData);
 
-  const handleDeletePackage = (pkgId: string) => {
-    if (confirm('Are you sure you want to delete this package?')) {
-      setPackages(packages.filter(pkg => pkg.id !== pkgId));
+      showToast({
+        type: 'success',
+        title: 'Thành công',
+        message: 'Đã thêm gói dịch vụ mới'
+      });
+
+      setIsAddModalOpen(false);
+      resetForm();
+      fetchPackages();
+    } catch (error: unknown) {
+      console.error('Failed to create package:', error);
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: axiosError.response?.data?.message || 'Không thể thêm gói dịch vụ'
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const openEditModal = (pkg: ServicePackage) => {
+  const handleEditPackage = async () => {
+    if (!editingPackage) return;
+
+    setIsSubmitting(true);
+    try {
+      const requestData: ReqUpdatePackageDTO = {
+        packageName: formData.packageName,
+        description: formData.description,
+        price: parseFloat(formData.price),
+        durationInDays: parseInt(formData.durationInDays),
+        type: formData.type,
+        numberOfSessions: formData.numberOfSessions ? parseInt(formData.numberOfSessions) : 0,
+        isActive: formData.isActive
+      };
+
+      await packageApi.update(editingPackage.id, requestData);
+
+      showToast({
+        type: 'success',
+        title: 'Thành công',
+        message: 'Đã cập nhật gói dịch vụ'
+      });
+
+      setIsEditModalOpen(false);
+      setEditingPackage(null);
+      resetForm();
+      fetchPackages();
+    } catch (error: unknown) {
+      console.error('Failed to update package:', error);
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: axiosError.response?.data?.message || 'Không thể cập nhật gói dịch vụ'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeletePackage = async () => {
+    if (!selectedPackage) return;
+
+    setIsSubmitting(true);
+    try {
+      await packageApi.delete(selectedPackage.id);
+
+      showToast({
+        type: 'success',
+        title: 'Thành công',
+        message: `Đã xóa gói dịch vụ ${selectedPackage.packageName}`
+      });
+
+      setIsDeleteModalOpen(false);
+      setSelectedPackage(null);
+      fetchPackages();
+    } catch (error: unknown) {
+      console.error('Failed to delete package:', error);
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: axiosError.response?.data?.message || 'Không thể xóa gói dịch vụ'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleActivatePackage = async (pkg: ApiServicePackage) => {
+    try {
+      await packageApi.activate(pkg.id);
+      showToast({
+        type: 'success',
+        title: 'Thành công',
+        message: `Đã kích hoạt gói ${pkg.packageName}`
+      });
+      fetchPackages();
+    } catch (error: unknown) {
+      console.error('Failed to activate package:', error);
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: axiosError.response?.data?.message || 'Không thể kích hoạt gói dịch vụ'
+      });
+    }
+  };
+
+  const handleDeactivatePackage = async (pkg: ApiServicePackage) => {
+    try {
+      await packageApi.deactivate(pkg.id);
+      showToast({
+        type: 'success',
+        title: 'Thành công',
+        message: `Đã vô hiệu hóa gói ${pkg.packageName}`
+      });
+      fetchPackages();
+    } catch (error: unknown) {
+      console.error('Failed to deactivate package:', error);
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: axiosError.response?.data?.message || 'Không thể vô hiệu hóa gói dịch vụ'
+      });
+    }
+  };
+
+  const handleViewPackage = async (pkg: ApiServicePackage) => {
+    try {
+      const response = await packageApi.getById(pkg.id);
+      setSelectedPackage(response.data);
+      setIsViewModalOpen(true);
+    } catch (error) {
+      console.error('Failed to fetch package details:', error);
+      setSelectedPackage(pkg);
+      setIsViewModalOpen(true);
+    }
+  };
+
+  const openEditModal = (pkg: ApiServicePackage) => {
     setEditingPackage(pkg);
     setFormData({
-      name: pkg.name,
-      description: pkg.description,
+      packageName: pkg.packageName,
+      description: pkg.description || '',
+      price: pkg.price.toString(),
+      durationInDays: pkg.durationInDays.toString(),
       type: pkg.type,
-      duration: pkg.duration,
-      sessions: pkg.sessions === 'unlimited' ? 0 : pkg.sessions,
-      price: pkg.price,
+      numberOfSessions: pkg.numberOfSessions?.toString() || '',
       isActive: pkg.isActive
     });
     setIsEditModalOpen(true);
+  };
+
+  const openDeleteModal = (pkg: ApiServicePackage) => {
+    setSelectedPackage(pkg);
+    setIsDeleteModalOpen(true);
+  };
+
+  const resetForm = () => {
+    setFormData({
+      packageName: '',
+      description: '',
+      price: '',
+      durationInDays: '',
+      type: PackageType.NO_PT,
+      numberOfSessions: '',
+      isActive: true
+    });
   };
 
   return (
@@ -166,277 +351,453 @@ function ServicePackages({ userRole, currentUserId = 'admin-1' }: ServicePackage
       <div className="service-packages__header">
         <div>
           <h1 className="service-packages__title">Service Packages</h1>
-          <p className="service-packages__subtitle">Manage membership packages and pricing</p>
+          <p className="service-packages__subtitle">Manage gym membership packages and services</p>
         </div>
-        <button className="service-packages__create-btn" onClick={() => setIsCreateModalOpen(true)}>
-          <Plus size={20} />
-          Create Package
-        </button>
+        <div className="service-packages__header-actions">
+          <button
+            className="service-packages__refresh-btn"
+            onClick={fetchPackages}
+            disabled={isLoading}
+            title="Refresh"
+          >
+            <RefreshCw size={18} className={isLoading ? 'spinning' : ''} />
+          </button>
+          <button className="service-packages__create-btn" onClick={() => setIsAddModalOpen(true)}>
+            <Plus size={20} />
+            Add Package
+          </button>
+        </div>
       </div>
 
       <div className="service-packages__stats">
         <div className="stat-box">
-          <span className="stat-box__label">Total packages</span>
+          <span className="stat-box__label">Total Packages</span>
           <span className="stat-box__value">{totalPackages}</span>
         </div>
         <div className="stat-box">
-          <span className="stat-box__label">Active packages</span>
+          <span className="stat-box__label">Active Packages</span>
           <span className="stat-box__value">{activePackages}</span>
         </div>
         <div className="stat-box">
-          <span className="stat-box__label">Most popular</span>
-          <span className="stat-box__value">{mostPopular}</span>
+          <span className="stat-box__label">PT Packages</span>
+          <span className="stat-box__value">{ptPackages}</span>
         </div>
         <div className="stat-box">
-          <span className="stat-box__label">Avg. price</span>
-          <span className="stat-box__value">${avgPrice}</span>
+          <span className="stat-box__label">Total Value</span>
+          <span className="stat-box__value">{formatCurrency(totalRevenue)}</span>
         </div>
       </div>
 
+      {/* Filters */}
       <div className="service-packages__filters">
         <div className="service-packages__search">
-          <Search size={18} className="service-packages__search-icon" />
+          <Search size={18} />
           <input
             type="text"
-            placeholder="Search by package name or ID..."
+            placeholder="Search packages by name..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
           />
+          <button onClick={handleSearch}>Search</button>
         </div>
         <div className="service-packages__filter-group">
-          <div className="service-packages__select">
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}>
-              <option value="all">All Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-            <ChevronDown size={16} />
-          </div>
-          <div className="service-packages__select">
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest' | 'price')}>
-              <option value="newest">Newest</option>
-              <option value="oldest">Oldest</option>
-              <option value="price">Price</option>
-            </select>
-            <ChevronDown size={16} />
-          </div>
+          <select
+            value={filterType}
+            onChange={(e) => handleFilterByType(e.target.value)}
+            className="service-packages__filter-select"
+          >
+            <option value="all">All Types</option>
+            <option value={PackageType.PT_INCLUDED}>PT Included</option>
+            <option value={PackageType.NO_PT}>No PT</option>
+          </select>
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="service-packages__filter-select"
+          >
+            <option value="all">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
         </div>
       </div>
 
-      <div className="service-packages__grid">
-        {filteredPackages.map(pkg => (
-          <div key={pkg.id} className="package-card">
-            <div className="package-card__header">
-              <div className="package-card__title-row">
-                <h3 className="package-card__name">{pkg.name}</h3>
-                <span className={`package-card__type package-card__type--${pkg.type}`}>
-                  {pkg.type === 'pt' ? 'PT Included' : 'No PT'}
-                </span>
-              </div>
-              {canEditPackage(pkg) && (
-                <div className="package-card__actions">
-                  <button className="package-card__action-btn" onClick={() => openEditModal(pkg)}>
-                    <Pencil size={16} />
-                  </button>
-                  <button 
-                    className="package-card__action-btn package-card__action-btn--delete"
-                    onClick={() => handleDeletePackage(pkg.id)}
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              )}
-            </div>
-            <p className="package-card__id">ID: {pkg.id} | By: {pkg.createdBy}</p>
-            <p className="package-card__description">{pkg.description}</p>
-            <div className="package-card__details">
-              <div className="package-card__detail">
-                <span className="package-card__detail-label">Duration</span>
-                <span className="package-card__detail-value">{pkg.duration} days</span>
-              </div>
-              <div className="package-card__detail">
-                <span className="package-card__detail-label">Sessions</span>
-                <span className="package-card__detail-value">
-                  {pkg.sessions === 'unlimited' ? 'Unlimited' : pkg.sessions}
-                </span>
-              </div>
-              <div className="package-card__detail">
-                <span className="package-card__detail-label">Price</span>
-                <span className="package-card__detail-value">${pkg.price}</span>
-              </div>
-            </div>
-            <div className="package-card__footer">
-              <span className={`package-card__status package-card__status--${pkg.isActive ? 'active' : 'inactive'}`}>
-                <span className="package-card__status-dot"></span>
-                {pkg.isActive ? 'Active' : 'Inactive'}
-              </span>
-            </div>
+      <div className="service-packages__table-container">
+        {isLoading ? (
+          <div className="service-packages__loading">
+            <RefreshCw size={32} className="spinning" />
+            <p>Loading packages...</p>
           </div>
-        ))}
+        ) : (
+          <table className="service-packages__table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>PACKAGE NAME</th>
+                <th>TYPE</th>
+                <th>DURATION</th>
+                <th>SESSIONS</th>
+                <th>PRICE</th>
+                <th>STATUS</th>
+                <th>ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredPackages.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="service-packages__empty">
+                    No packages found
+                  </td>
+                </tr>
+              ) : (
+                filteredPackages.map(pkg => (
+                  <tr key={pkg.id} className={!pkg.isActive ? 'service-packages__row--inactive' : ''}>
+                    <td>#{pkg.id}</td>
+                    <td className="service-packages__name">
+                      <div className="service-packages__name-cell">
+                        <span className="service-packages__name-text">{pkg.packageName}</span>
+                        {pkg.description && (
+                          <span className="service-packages__description">{pkg.description}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <span className={`service-packages__type service-packages__type--${pkg.type.toLowerCase().replace('_', '-')}`}>
+                        {getPackageTypeLabel(pkg.type)}
+                      </span>
+                    </td>
+                    <td>{pkg.durationInDays} days</td>
+                    <td>
+                      {pkg.numberOfSessions ? (
+                        <span className="service-packages__sessions">{pkg.numberOfSessions}</span>
+                      ) : (
+                        '-'
+                      )}
+                    </td>
+                    <td className="service-packages__price">{formatCurrency(pkg.price)}</td>
+                    <td>
+                      <span className={`service-packages__status service-packages__status--${pkg.isActive ? 'active' : 'inactive'}`}>
+                        {pkg.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="service-packages__actions">
+                        <button
+                          className="service-packages__action-btn"
+                          onClick={() => handleViewPackage(pkg)}
+                          title="View Details"
+                        >
+                          <Eye size={16} />
+                        </button>
+                        <button
+                          className="service-packages__action-btn"
+                          onClick={() => openEditModal(pkg)}
+                          title="Edit"
+                        >
+                          <Pencil size={16} />
+                        </button>
+                        {pkg.isActive ? (
+                          <button
+                            className="service-packages__action-btn service-packages__action-btn--deactivate"
+                            onClick={() => handleDeactivatePackage(pkg)}
+                            title="Deactivate"
+                          >
+                            <PowerOff size={16} />
+                          </button>
+                        ) : (
+                          <button
+                            className="service-packages__action-btn service-packages__action-btn--activate"
+                            onClick={() => handleActivatePackage(pkg)}
+                            title="Activate"
+                          >
+                            <Power size={16} />
+                          </button>
+                        )}
+                        <button
+                          className="service-packages__action-btn service-packages__action-btn--delete"
+                          onClick={() => openDeleteModal(pkg)}
+                          title="Delete"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
 
-      {/* Create Package Modal */}
-      <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Create new package">
-        <form className="modal-form" onSubmit={(e) => { e.preventDefault(); handleCreatePackage(); }}>
+      {/* Add Package Modal */}
+      <Modal isOpen={isAddModalOpen} onClose={() => { setIsAddModalOpen(false); resetForm(); }} title="Add New Package">
+        <form className="modal-form" onSubmit={(e) => { e.preventDefault(); handleAddPackage(); }}>
           <div className="modal-form__group">
-            <label className="modal-form__label modal-form__label--required">Name</label>
+            <label className="modal-form__label modal-form__label--required">Package Name</label>
             <input
               type="text"
               className="modal-form__input"
-              placeholder="E.g., Premium..."
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="e.g., Premium Monthly"
+              value={formData.packageName}
+              onChange={(e) => setFormData({ ...formData, packageName: e.target.value })}
               required
             />
           </div>
+
           <div className="modal-form__group">
-            <label className="modal-form__label modal-form__label--required">Description</label>
+            <label className="modal-form__label">Description</label>
             <textarea
               className="modal-form__textarea"
-              placeholder="Describe what's included..."
+              placeholder="Package description..."
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              required
+              rows={3}
             />
           </div>
-          <div className="modal-form__group">
-            <label className="modal-form__label modal-form__label--required">Type</label>
-            <select
-              className="modal-form__select"
-              value={formData.type}
-              onChange={(e) => setFormData({ ...formData, type: e.target.value as PackageType })}
-            >
-              <option value="no-pt">No PT</option>
-              <option value="pt">PT</option>
-            </select>
-          </div>
+
           <div className="modal-form__row">
+            <div className="modal-form__group">
+              <label className="modal-form__label modal-form__label--required">Price (VND)</label>
+              <input
+                type="number"
+                className="modal-form__input"
+                placeholder="e.g., 500000"
+                value={formData.price}
+                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                required
+                min="0"
+              />
+            </div>
             <div className="modal-form__group">
               <label className="modal-form__label modal-form__label--required">Duration (days)</label>
               <input
                 type="number"
                 className="modal-form__input"
-                value={formData.duration || ''}
-                onChange={(e) => setFormData({ ...formData, duration: parseInt(e.target.value) || 0 })}
+                placeholder="e.g., 30"
+                value={formData.durationInDays}
+                onChange={(e) => setFormData({ ...formData, durationInDays: e.target.value })}
                 required
+                min="1"
               />
             </div>
+          </div>
+
+          <div className="modal-form__row">
             <div className="modal-form__group">
-              <label className="modal-form__label modal-form__label--required">Price ($)</label>
+              <label className="modal-form__label modal-form__label--required">Package Type</label>
+              <select
+                className="modal-form__select"
+                value={formData.type}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value as PackageTypeEnum })}
+                required
+              >
+                <option value={PackageType.NO_PT}>No PT</option>
+                <option value={PackageType.PT_INCLUDED}>PT Included</option>
+              </select>
+            </div>
+            <div className="modal-form__group">
+              <label className="modal-form__label">Number of Sessions</label>
               <input
                 type="number"
                 className="modal-form__input"
-                value={formData.price || ''}
-                onChange={(e) => setFormData({ ...formData, price: parseInt(e.target.value) || 0 })}
-                required
+                placeholder="e.g., 12"
+                value={formData.numberOfSessions}
+                onChange={(e) => setFormData({ ...formData, numberOfSessions: e.target.value })}
+                min="0"
               />
             </div>
           </div>
-          <div className="modal-form__group">
-            <label className="modal-form__label modal-form__label--required">Session count</label>
-            <input
-              type="number"
-              className="modal-form__input"
-              value={formData.sessions || ''}
-              onChange={(e) => setFormData({ ...formData, sessions: parseInt(e.target.value) || 0 })}
-            />
-            <span className="modal-form__hint">Set as 0 for unlimited sessions</span>
-          </div>
+
           <div className="modal-form__actions">
-            <button type="button" className="modal-form__btn modal-form__btn--secondary" onClick={() => setIsCreateModalOpen(false)}>
+            <button
+              type="button"
+              className="modal-form__btn modal-form__btn--secondary"
+              onClick={() => { setIsAddModalOpen(false); resetForm(); }}
+              disabled={isSubmitting}
+            >
               Cancel
             </button>
-            <button type="submit" className="modal-form__btn modal-form__btn--primary">
-              Create Package
+            <button
+              type="submit"
+              className="modal-form__btn modal-form__btn--primary"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Adding...' : 'Add Package'}
             </button>
           </div>
         </form>
       </Modal>
 
       {/* Edit Package Modal */}
-      <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Edit Package">
+      <Modal isOpen={isEditModalOpen} onClose={() => { setIsEditModalOpen(false); setEditingPackage(null); resetForm(); }} title="Edit Package">
         <form className="modal-form" onSubmit={(e) => { e.preventDefault(); handleEditPackage(); }}>
           <div className="modal-form__group">
             <label className="modal-form__label modal-form__label--required">Package Name</label>
             <input
               type="text"
               className="modal-form__input"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              value={formData.packageName}
+              onChange={(e) => setFormData({ ...formData, packageName: e.target.value })}
               required
             />
           </div>
+
           <div className="modal-form__group">
-            <label className="modal-form__label modal-form__label--required">Description</label>
+            <label className="modal-form__label">Description</label>
             <textarea
               className="modal-form__textarea"
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              required
+              rows={3}
             />
           </div>
-          <div className="modal-form__group">
-            <label className="modal-form__label modal-form__label--required">Package Type</label>
-            <select
-              className="modal-form__select"
-              value={formData.type}
-              onChange={(e) => setFormData({ ...formData, type: e.target.value as PackageType })}
-            >
-              <option value="no-pt">No PT</option>
-              <option value="pt">Premium</option>
-            </select>
-          </div>
+
           <div className="modal-form__row">
             <div className="modal-form__group">
-              <label className="modal-form__label modal-form__label--required">Duration (Days)</label>
+              <label className="modal-form__label modal-form__label--required">Price (VND)</label>
               <input
                 type="number"
                 className="modal-form__input"
-                value={formData.duration || ''}
-                onChange={(e) => setFormData({ ...formData, duration: parseInt(e.target.value) || 0 })}
+                value={formData.price}
+                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                 required
+                min="0"
               />
             </div>
             <div className="modal-form__group">
-              <label className="modal-form__label modal-form__label--required">Price (₱)</label>
+              <label className="modal-form__label modal-form__label--required">Duration (days)</label>
               <input
                 type="number"
                 className="modal-form__input"
-                value={formData.price || ''}
-                onChange={(e) => setFormData({ ...formData, price: parseInt(e.target.value) || 0 })}
+                value={formData.durationInDays}
+                onChange={(e) => setFormData({ ...formData, durationInDays: e.target.value })}
                 required
+                min="1"
               />
             </div>
           </div>
-          <div className="modal-form__group">
-            <label className="modal-form__label">Session Count</label>
-            <input
-              type="number"
-              className="modal-form__input"
-              value={formData.sessions || ''}
-              onChange={(e) => setFormData({ ...formData, sessions: parseInt(e.target.value) || 0 })}
-            />
-            <span className="modal-form__hint">Leave as 0 for unlimited sessions</span>
+
+          <div className="modal-form__row">
+            <div className="modal-form__group">
+              <label className="modal-form__label modal-form__label--required">Package Type</label>
+              <select
+                className="modal-form__select"
+                value={formData.type}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value as PackageTypeEnum })}
+                required
+              >
+                <option value={PackageType.NO_PT}>No PT</option>
+                <option value={PackageType.PT_INCLUDED}>PT Included</option>
+              </select>
+            </div>
+            <div className="modal-form__group">
+              <label className="modal-form__label">Number of Sessions</label>
+              <input
+                type="number"
+                className="modal-form__input"
+                value={formData.numberOfSessions}
+                onChange={(e) => setFormData({ ...formData, numberOfSessions: e.target.value })}
+                min="0"
+              />
+            </div>
           </div>
-          <div className="modal-form__checkbox">
-            <input
-              type="checkbox"
-              id="isActive"
-              checked={formData.isActive}
-              onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-            />
-            <label htmlFor="isActive">Active (visible to members)</label>
-          </div>
+
           <div className="modal-form__actions">
-            <button type="button" className="modal-form__btn modal-form__btn--secondary" onClick={() => setIsEditModalOpen(false)}>
+            <button
+              type="button"
+              className="modal-form__btn modal-form__btn--secondary"
+              onClick={() => { setIsEditModalOpen(false); setEditingPackage(null); resetForm(); }}
+              disabled={isSubmitting}
+            >
               Cancel
             </button>
-            <button type="submit" className="modal-form__btn modal-form__btn--primary">
-              Update Package
+            <button
+              type="submit"
+              className="modal-form__btn modal-form__btn--primary"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Updating...' : 'Update Package'}
             </button>
           </div>
         </form>
       </Modal>
+
+      {/* View Package Modal */}
+      <Modal isOpen={isViewModalOpen} onClose={() => { setIsViewModalOpen(false); setSelectedPackage(null); }} title="Package Details">
+        {selectedPackage && (
+          <div className="service-packages__view-modal">
+            <div className="service-packages__view-grid">
+              <div className="service-packages__view-item">
+                <span className="service-packages__view-label">ID</span>
+                <span className="service-packages__view-value">#{selectedPackage.id}</span>
+              </div>
+              <div className="service-packages__view-item">
+                <span className="service-packages__view-label">Package Name</span>
+                <span className="service-packages__view-value">{selectedPackage.packageName}</span>
+              </div>
+              <div className="service-packages__view-item service-packages__view-item--full">
+                <span className="service-packages__view-label">Description</span>
+                <span className="service-packages__view-value">{selectedPackage.description || '-'}</span>
+              </div>
+              <div className="service-packages__view-item">
+                <span className="service-packages__view-label">Price</span>
+                <span className="service-packages__view-value service-packages__view-value--price">
+                  {formatCurrency(selectedPackage.price)}
+                </span>
+              </div>
+              <div className="service-packages__view-item">
+                <span className="service-packages__view-label">Duration</span>
+                <span className="service-packages__view-value">{selectedPackage.durationInDays} days</span>
+              </div>
+              <div className="service-packages__view-item">
+                <span className="service-packages__view-label">Package Type</span>
+                <span className={`service-packages__type service-packages__type--${selectedPackage.type.toLowerCase().replace('_', '-')}`}>
+                  {getPackageTypeLabel(selectedPackage.type)}
+                </span>
+              </div>
+              <div className="service-packages__view-item">
+                <span className="service-packages__view-label">Number of Sessions</span>
+                <span className="service-packages__view-value">{selectedPackage.numberOfSessions || '-'}</span>
+              </div>
+              <div className="service-packages__view-item">
+                <span className="service-packages__view-label">Status</span>
+                <span className={`service-packages__status service-packages__status--${selectedPackage.isActive ? 'active' : 'inactive'}`}>
+                  {selectedPackage.isActive ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+              <div className="service-packages__view-item">
+                <span className="service-packages__view-label">Created By</span>
+                <span className="service-packages__view-value">{selectedPackage.createdBy || '-'}</span>
+              </div>
+              <div className="service-packages__view-item">
+                <span className="service-packages__view-label">Created At</span>
+                <span className="service-packages__view-value">{formatDate(selectedPackage.createdAt)}</span>
+              </div>
+              {selectedPackage.updatedAt && (
+                <div className="service-packages__view-item">
+                  <span className="service-packages__view-label">Updated At</span>
+                  <span className="service-packages__view-value">{formatDate(selectedPackage.updatedAt)}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => { setIsDeleteModalOpen(false); setSelectedPackage(null); }}
+        onConfirm={handleDeletePackage}
+        title="Delete Package"
+        message={`Are you sure you want to delete "${selectedPackage?.packageName}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={isSubmitting}
+      />
     </div>
   );
 }

@@ -1,7 +1,9 @@
-import { useState } from 'react';
-import { Search, ChevronDown, Pencil, FileText, Eye, Upload } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, ChevronDown, Pencil, Trash2, Eye, RefreshCw } from 'lucide-react';
 import Modal from '../../Modal/index.ts';
-import type { Member, MemberStatus, Gender, Contract } from '../../../../types/index.ts';
+import { ConfirmModal, useToast } from '../../../ui/index.ts';
+import { memberApi } from '../../../../services/index.ts';
+import type { ApiMember, GenderEnum, ReqCreateMemberDTO, ReqUpdateMemberDTO } from '../../../../types/api.ts';
 import './Customers.css';
 
 interface CustomersProps {
@@ -9,138 +11,123 @@ interface CustomersProps {
   currentUserId?: string;
 }
 
-// Mock data
-const mockMembers: Member[] = [
-  {
-    id: 'SFM2301N1',
-    name: 'Johnny Sins',
-    email: 'johnny@gmail.com',
-    phone: '0923346529',
-    dateOfBirth: '20/01/2000',
-    gender: 'male',
-    cccd: '023432149213',
-    avatar: '/images/avatar1.jpg',
-    dateJoined: '11/01/2026',
-    dateExpiration: '11/2/2026',
-    status: 'active',
-    contractId: 'CTR001',
-    trainerId: 'pt-1'
-  },
-  {
-    id: 'SFM2301N2',
-    name: 'Juan Dela Cruz',
-    email: 'juan@gmail.com',
-    phone: '0912345678',
-    dateOfBirth: '15/05/1995',
-    gender: 'male',
-    cccd: '023432149214',
-    dateJoined: '11/01/2026',
-    dateExpiration: '11/2/2026',
-    status: 'active',
-    contractId: 'CTR002',
-    trainerId: 'pt-2'
-  },
-  {
-    id: 'SFM2301N3',
-    name: 'Jen Velasquez',
-    email: 'jen@gmail.com',
-    phone: '0987654321',
-    dateOfBirth: '22/03/1998',
-    gender: 'female',
-    cccd: '023432149215',
-    dateJoined: '20/01/2026',
-    status: 'no-contract'
-  },
-  {
-    id: 'SFM2301N4',
-    name: 'Tom Hall',
-    email: 'tom@gmail.com',
-    phone: '0956789012',
-    dateOfBirth: '10/08/1992',
-    gender: 'male',
-    cccd: '023432149216',
-    dateJoined: '15/01/2025',
-    dateExpiration: '15/07/2025',
-    status: 'expired',
-    contractId: 'CTR003',
-    trainerId: 'pt-1'
-  }
-];
+// Helper to format date from YYYY-MM-DD to DD/MM/YYYY
+const formatDateDisplay = (dateStr: string | null | undefined): string => {
+  if (!dateStr) return '-';
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('vi-VN');
+};
 
-const mockContract: Contract = {
-  id: 'CTR001',
-  memberId: 'SFM2301N1',
-  memberName: 'Johnny Sins',
-  memberAvatar: '/images/avatar1.jpg',
-  trainerId: 'pt-1',
-  trainerName: 'Martell Chen',
-  trainerAvatar: '/images/trainer1.jpg',
-  packageId: 'pkg-1',
-  packageName: 'Premium PT Package',
-  startDate: '11/01/2026',
-  endDate: '11/02/2026',
-  duration: 30,
-  sessions: 12,
-  completedSessions: 4,
-  price: 2500000,
-  totalAmount: 2500000,
-  paymentMethod: 'transfer',
-  status: 'active',
-  signedAt: '11/01/2026'
+// Helper to format date from DD/MM/YYYY to YYYY-MM-DD for API
+const formatDateForApi = (dateStr: string): string => {
+  if (!dateStr) return '';
+  // If already in YYYY-MM-DD format
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+  // Convert from DD/MM/YYYY
+  const parts = dateStr.split('/');
+  if (parts.length === 3) {
+    return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+  }
+  return dateStr;
+};
+
+// Helper to convert API gender to display
+const getGenderDisplay = (gender: GenderEnum): string => {
+  return gender === 'MALE' ? 'Male' : 'Female';
+};
+
+// Helper to get status badge
+const getStatusBadge = (status: string) => {
+  const config: Record<string, { label: string; className: string }> = {
+    'ACTIVE': { label: 'Active', className: 'customers__status--active' },
+    'INACTIVE': { label: 'Inactive', className: 'customers__status--inactive' }
+  };
+  return config[status] || { label: status, className: 'customers__status--default' };
 };
 
 function Customers({ userRole, currentUserId }: CustomersProps) {
+  void currentUserId; // Reserved for future self-edit restrictions
+  const { showToast } = useToast();
+  
+  // Data state
+  const [members, setMembers] = useState<ApiMember[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Filter/pagination state
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<MemberStatus | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'ACTIVE' | 'INACTIVE'>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
   const [showEntities, setShowEntities] = useState(4);
   const [currentPage, setCurrentPage] = useState(1);
   
+  // Modal state
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [showContractModal, setShowContractModal] = useState(false);
-  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
-  const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<ApiMember | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    name: '',
-    dateOfBirth: '',
-    gender: '' as Gender | '',
-    phone: '',
+    fullname: '',
+    dob: '',
+    gender: '' as GenderEnum | '',
+    phoneNumber: '',
     cccd: '',
-    avatar: ''
+    avatarUrl: ''
   });
 
-  // Filter members based on role
-  const getFilteredMembers = () => {
-    let filtered = mockMembers;
+  // Fetch members on mount
+  useEffect(() => {
+    fetchMembers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-    // PT can only see members with contracts that include them
-    if (userRole === 'pt' && currentUserId) {
-      filtered = filtered.filter(m => m.trainerId === currentUserId);
+  const fetchMembers = async () => {
+    setIsLoading(true);
+    try {
+      const response = await memberApi.getAll();
+      setMembers(response.data);
+    } catch (error) {
+      console.error('Failed to fetch members:', error);
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: 'Không thể tải danh sách hội viên'
+      });
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  // Filter and sort members
+  const getFilteredMembers = () => {
+    let filtered = [...members];
 
     // Apply search filter
     if (searchTerm) {
+      const term = searchTerm.toLowerCase();
       filtered = filtered.filter(m => 
-        m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        m.id.toLowerCase().includes(searchTerm.toLowerCase())
+        m.user.fullname.toLowerCase().includes(term) ||
+        m.user.email.toLowerCase().includes(term) ||
+        m.cccd.includes(searchTerm) ||
+        m.id.toString().includes(searchTerm)
       );
     }
 
     // Apply status filter
     if (statusFilter !== 'all') {
-      filtered = filtered.filter(m => m.status === statusFilter);
+      filtered = filtered.filter(m => m.user.status === statusFilter);
     }
 
     // Sort
-    filtered = [...filtered].sort((a, b) => {
-      const dateA = new Date(a.dateJoined.split('/').reverse().join('-'));
-      const dateB = new Date(b.dateJoined.split('/').reverse().join('-'));
-      return sortBy === 'newest' ? dateB.getTime() - dateA.getTime() : dateA.getTime() - dateB.getTime();
+    filtered.sort((a, b) => {
+      const dateA = new Date(a.createdAt).getTime();
+      const dateB = new Date(b.createdAt).getTime();
+      return sortBy === 'newest' ? dateB - dateA : dateA - dateB;
     });
 
     return filtered;
@@ -153,61 +140,166 @@ function Customers({ userRole, currentUserId }: CustomersProps) {
     currentPage * showEntities
   );
 
-  const handleEdit = (member: Member) => {
+  const handleView = async (member: ApiMember) => {
+    try {
+      const response = await memberApi.search({ memberId: member.id });
+      setSelectedMember(response.data);
+      setShowViewModal(true);
+    } catch (error) {
+      console.error('Failed to fetch member details:', error);
+      setSelectedMember(member);
+      setShowViewModal(true);
+    }
+  };
+
+  const handleEdit = (member: ApiMember) => {
     setSelectedMember(member);
     setFormData({
-      email: member.email,
-      password: '********',
-      name: member.name,
-      dateOfBirth: member.dateOfBirth,
-      gender: member.gender,
-      phone: member.phone,
+      email: member.user.email,
+      password: '',
+      fullname: member.user.fullname,
+      dob: member.user.dob,
+      gender: member.user.gender,
+      phoneNumber: member.user.phoneNumber,
       cccd: member.cccd,
-      avatar: member.avatar || ''
+      avatarUrl: member.user.avatarUrl || ''
     });
     setShowEditModal(true);
   };
 
-  const handleViewContract = (member: Member) => {
-    // In real app, fetch contract by member.contractId
+  const handleDeleteClick = (member: ApiMember) => {
     setSelectedMember(member);
-    setSelectedContract(mockContract);
-    setShowContractModal(true);
+    setShowDeleteModal(true);
   };
 
-  const handleAddMember = () => {
-    console.log('Adding member:', formData);
-    setShowAddModal(false);
-    resetForm();
+  const handleAddMember = async () => {
+    if (!formData.fullname || !formData.email || !formData.password || !formData.gender || !formData.dob || !formData.phoneNumber || !formData.cccd) {
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: 'Vui lòng điền đầy đủ thông tin bắt buộc'
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const requestData: ReqCreateMemberDTO = {
+        fullname: formData.fullname,
+        email: formData.email,
+        password: formData.password,
+        phoneNumber: formData.phoneNumber,
+        avatarUrl: formData.avatarUrl || 'string',
+        dob: formatDateForApi(formData.dob),
+        gender: formData.gender as GenderEnum,
+        status: 'ACTIVE',
+        cccd: formData.cccd
+      };
+
+      await memberApi.create(requestData);
+      
+      showToast({
+        type: 'success',
+        title: 'Thành công',
+        message: 'Đã thêm hội viên mới'
+      });
+
+      setShowAddModal(false);
+      resetForm();
+      fetchMembers();
+    } catch (error: unknown) {
+      console.error('Failed to create member:', error);
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: axiosError.response?.data?.message || 'Không thể thêm hội viên'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleUpdateMember = () => {
-    console.log('Updating member:', formData);
-    setShowEditModal(false);
-    resetForm();
+  const handleUpdateMember = async () => {
+    if (!selectedMember) return;
+
+    setIsSubmitting(true);
+    try {
+      const requestData: ReqUpdateMemberDTO = {
+        fullname: formData.fullname,
+        email: formData.email,
+        phoneNumber: formData.phoneNumber,
+        avatarUrl: formData.avatarUrl || 'string',
+        dob: formatDateForApi(formData.dob),
+        gender: formData.gender as GenderEnum,
+        cccd: formData.cccd
+      };
+
+      await memberApi.update(selectedMember.id, requestData);
+      
+      showToast({
+        type: 'success',
+        title: 'Thành công',
+        message: 'Đã cập nhật thông tin hội viên'
+      });
+
+      setShowEditModal(false);
+      resetForm();
+      fetchMembers();
+    } catch (error: unknown) {
+      console.error('Failed to update member:', error);
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: axiosError.response?.data?.message || 'Không thể cập nhật thông tin'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteMember = async () => {
+    if (!selectedMember) return;
+
+    setIsSubmitting(true);
+    try {
+      await memberApi.delete(selectedMember.id);
+      
+      showToast({
+        type: 'success',
+        title: 'Thành công',
+        message: `Đã xóa hội viên ${selectedMember.user.fullname}`
+      });
+
+      setShowDeleteModal(false);
+      setSelectedMember(null);
+      fetchMembers();
+    } catch (error: unknown) {
+      console.error('Failed to delete member:', error);
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: axiosError.response?.data?.message || 'Không thể xóa hội viên'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const resetForm = () => {
     setFormData({
       email: '',
       password: '',
-      name: '',
-      dateOfBirth: '',
+      fullname: '',
+      dob: '',
       gender: '',
-      phone: '',
+      phoneNumber: '',
       cccd: '',
-      avatar: ''
+      avatarUrl: ''
     });
     setSelectedMember(null);
-  };
-
-  const getStatusBadge = (status: MemberStatus) => {
-    const config = {
-      'active': { label: 'Active', className: 'customers__status--active' },
-      'no-contract': { label: 'No Contract', className: 'customers__status--no-contract' },
-      'expired': { label: 'Expired', className: 'customers__status--expired' }
-    };
-    return config[status];
   };
 
   const sectionTitle = userRole === 'admin' ? 'Customers' : 'Members';
@@ -217,11 +309,19 @@ function Customers({ userRole, currentUserId }: CustomersProps) {
 
   const renderFooter = (onCancel: () => void, onSubmit: () => void, submitLabel: string) => (
     <>
-      <button className="modal-form__btn modal-form__btn--secondary" onClick={onCancel}>
+      <button 
+        className="modal-form__btn modal-form__btn--secondary" 
+        onClick={onCancel}
+        disabled={isSubmitting}
+      >
         Cancel
       </button>
-      <button className="modal-form__btn modal-form__btn--primary" onClick={onSubmit}>
-        {submitLabel}
+      <button 
+        className="modal-form__btn modal-form__btn--primary" 
+        onClick={onSubmit}
+        disabled={isSubmitting}
+      >
+        {isSubmitting ? 'Processing...' : submitLabel}
       </button>
     </>
   );
@@ -233,11 +333,21 @@ function Customers({ userRole, currentUserId }: CustomersProps) {
           <h1 className="customers__title">{sectionTitle}</h1>
           <p className="customers__subtitle">{sectionSubtitle}</p>
         </div>
-        {userRole === 'admin' && (
-          <button className="customers__add-btn" onClick={() => setShowAddModal(true)}>
-            + Add Member
+        <div className="customers__header-actions">
+          <button 
+            className="customers__refresh-btn" 
+            onClick={fetchMembers}
+            disabled={isLoading}
+            title="Refresh"
+          >
+            <RefreshCw size={18} className={isLoading ? 'spinning' : ''} />
           </button>
-        )}
+          {userRole === 'admin' && (
+            <button className="customers__add-btn" onClick={() => setShowAddModal(true)}>
+              + Add Member
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
@@ -246,7 +356,7 @@ function Customers({ userRole, currentUserId }: CustomersProps) {
           <Search size={18} />
           <input
             type="text"
-            placeholder="Search by member name or ID..."
+            placeholder="Search by name, email, ID, or CCCD..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -255,12 +365,11 @@ function Customers({ userRole, currentUserId }: CustomersProps) {
           <div className="customers__select-wrapper">
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as MemberStatus | 'all')}
+              onChange={(e) => setStatusFilter(e.target.value as 'all' | 'ACTIVE' | 'INACTIVE')}
             >
               <option value="all">All Status</option>
-              <option value="active">Active</option>
-              <option value="no-contract">No Contract</option>
-              <option value="expired">Expired</option>
+              <option value="ACTIVE">Active</option>
+              <option value="INACTIVE">Inactive</option>
             </select>
             <ChevronDown size={16} />
           </div>
@@ -289,93 +398,121 @@ function Customers({ userRole, currentUserId }: CustomersProps) {
 
       {/* Table */}
       <div className="customers__table-container">
-        <table className="customers__table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>PFP</th>
-              <th>Member ID</th>
-              <th>Date Joined</th>
-              <th>Date Expiration</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {paginatedMembers.map((member) => {
-              const statusBadge = getStatusBadge(member.status);
-              return (
-                <tr key={member.id}>
-                  <td>{member.name}</td>
-                  <td>
-                    <div className="customers__avatar">
-                      <img 
-                        src={member.avatar || '/images/user-icon-placeholder.png'} 
-                        alt={member.name} 
-                      />
-                    </div>
-                  </td>
-                  <td>{member.id}</td>
-                  <td>{member.dateJoined}</td>
-                  <td>{member.dateExpiration || '-'}</td>
-                  <td>
-                    <span className={`customers__status ${statusBadge.className}`}>
-                      {statusBadge.label}
-                    </span>
-                  </td>
-                  <td>
-                    <div className="customers__actions">
-                      {userRole === 'admin' && (
-                        <button 
-                          className="customers__action-btn"
-                          onClick={() => handleEdit(member)}
-                          title="Edit"
-                        >
-                          <Pencil size={16} />
-                        </button>
-                      )}
-                      {member.contractId ? (
-                        <button 
-                          className="customers__action-btn"
-                          onClick={() => handleViewContract(member)}
-                          title="View Contract"
-                        >
-                          <FileText size={16} />
-                        </button>
-                      ) : (
-                        <button 
-                          className="customers__action-btn customers__action-btn--disabled"
-                          disabled
-                          title="No Contract"
-                        >
-                          <FileText size={16} />
-                        </button>
-                      )}
-                    </div>
+        {isLoading ? (
+          <div className="customers__loading">
+            <RefreshCw size={32} className="spinning" />
+            <p>Loading members...</p>
+          </div>
+        ) : (
+          <table className="customers__table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Join Date</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedMembers.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="customers__empty">
+                    No members found
                   </td>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              ) : (
+                paginatedMembers.map((member) => {
+                  const statusBadge = getStatusBadge(member.user.status);
+                  return (
+                    <tr key={member.id}>
+                      <td>#{member.id}</td>
+                      <td>
+                        <div className="customers__name-cell">
+                          <div className="customers__avatar">
+                            <img 
+                              src={member.user.avatarUrl || '/images/user-icon-placeholder.png'} 
+                              alt={member.user.fullname}
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = '/images/user-icon-placeholder.png';
+                              }}
+                            />
+                          </div>
+                          {member.user.fullname}
+                        </div>
+                      </td>
+                      <td>{member.user.email}</td>
+                      <td>{member.user.phoneNumber}</td>
+                      <td>{formatDateDisplay(member.joinDate)}</td>
+                      <td>
+                        <span className={`customers__status ${statusBadge.className}`}>
+                          {statusBadge.label}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="customers__actions">
+                          <button 
+                            className="customers__action-btn"
+                            onClick={() => handleView(member)}
+                            title="View Details"
+                          >
+                            <Eye size={16} />
+                          </button>
+                          {userRole === 'admin' && (
+                            <>
+                              <button 
+                                className="customers__action-btn"
+                                onClick={() => handleEdit(member)}
+                                title="Edit"
+                              >
+                                <Pencil size={16} />
+                              </button>
+                              <button 
+                                className="customers__action-btn customers__action-btn--delete"
+                                onClick={() => handleDeleteClick(member)}
+                                title="Delete"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {/* Pagination */}
       <div className="customers__pagination">
-        <button 
-          className="customers__page-btn"
-          disabled={currentPage === 1}
-          onClick={() => setCurrentPage(prev => prev - 1)}
-        >
-          Previous
-        </button>
-        <button 
-          className="customers__page-btn customers__page-btn--active"
-          disabled={currentPage === totalPages || totalPages === 0}
-          onClick={() => setCurrentPage(prev => prev + 1)}
-        >
-          Next
-        </button>
+        <span className="customers__pagination-info">
+          Showing {paginatedMembers.length} of {filteredMembers.length} members
+        </span>
+        <div className="customers__pagination-controls">
+          <button 
+            className="customers__page-btn"
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage(prev => prev - 1)}
+          >
+            Previous
+          </button>
+          <span className="customers__page-indicator">
+            Page {currentPage} of {totalPages || 1}
+          </span>
+          <button 
+            className="customers__page-btn"
+            disabled={currentPage === totalPages || totalPages === 0}
+            onClick={() => setCurrentPage(prev => prev + 1)}
+          >
+            Next
+          </button>
+        </div>
       </div>
 
       {/* Add Member Modal */}
@@ -393,18 +530,14 @@ function Customers({ userRole, currentUserId }: CustomersProps) {
         <div className="modal-form">
           {/* Profile Photo */}
           <div className="modal-form__group">
-            <label className="modal-form__label">Profile Photo</label>
-            <div className="customers__photo-upload">
-              <div className="customers__photo-preview">
-                <img src="/images/user-icon-placeholder.png" alt="Preview" />
-              </div>
-              <div className="customers__photo-dropzone">
-                <Upload size={24} />
-                <span>Click to upload or drag and drop</span>
-                <span className="customers__photo-hint">PNG, JPG, JPEG Up to 5MB</span>
-              </div>
-            </div>
-            <span className="modal-form__hint">Recommended: Square image, minimum 300x300px for best quality</span>
+            <label className="modal-form__label">Profile Photo URL</label>
+            <input
+              type="text"
+              className="modal-form__input"
+              placeholder="https://example.com/avatar.jpg"
+              value={formData.avatarUrl}
+              onChange={(e) => setFormData({ ...formData, avatarUrl: e.target.value })}
+            />
           </div>
 
           {/* Account Information */}
@@ -425,7 +558,7 @@ function Customers({ userRole, currentUserId }: CustomersProps) {
               <input
                 type="password"
                 className="modal-form__input"
-                placeholder="********"
+                placeholder="Minimum 8 characters"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
               />
@@ -440,19 +573,18 @@ function Customers({ userRole, currentUserId }: CustomersProps) {
               type="text"
               className="modal-form__input"
               placeholder="John Doe"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              value={formData.fullname}
+              onChange={(e) => setFormData({ ...formData, fullname: e.target.value })}
             />
           </div>
           <div className="modal-form__row">
             <div className="modal-form__group">
-              <label className="modal-form__label modal-form__label--required">Date of birth</label>
+              <label className="modal-form__label modal-form__label--required">Date of Birth</label>
               <input
-                type="text"
+                type="date"
                 className="modal-form__input"
-                placeholder="dd/mm/yyyy"
-                value={formData.dateOfBirth}
-                onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
+                value={formData.dob}
+                onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
               />
             </div>
             <div className="modal-form__group">
@@ -460,31 +592,30 @@ function Customers({ userRole, currentUserId }: CustomersProps) {
               <select
                 className="modal-form__select"
                 value={formData.gender}
-                onChange={(e) => setFormData({ ...formData, gender: e.target.value as Gender })}
+                onChange={(e) => setFormData({ ...formData, gender: e.target.value as GenderEnum })}
               >
-                <option value="">Select Type</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="other">Other</option>
+                <option value="">Select Gender</option>
+                <option value="MALE">Male</option>
+                <option value="FEMALE">Female</option>
               </select>
             </div>
           </div>
           <div className="modal-form__group">
-            <label className="modal-form__label modal-form__label--required">Phone number</label>
+            <label className="modal-form__label modal-form__label--required">Phone Number</label>
             <input
               type="tel"
               className="modal-form__input"
-              placeholder="0000000000"
-              value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              placeholder="0912345678"
+              value={formData.phoneNumber}
+              onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
             />
           </div>
           <div className="modal-form__group">
-            <label className="modal-form__label modal-form__label--required">CCCD</label>
+            <label className="modal-form__label modal-form__label--required">CCCD (Citizen ID)</label>
             <input
               type="text"
               className="modal-form__input"
-              placeholder="000000000000"
+              placeholder="012345678901"
               value={formData.cccd}
               onChange={(e) => setFormData({ ...formData, cccd: e.target.value })}
             />
@@ -501,56 +632,32 @@ function Customers({ userRole, currentUserId }: CustomersProps) {
         footer={renderFooter(
           () => { setShowEditModal(false); resetForm(); },
           handleUpdateMember,
-          'Confirm'
+          'Update Member'
         )}
       >
         <div className="modal-form">
           {/* Profile Photo */}
           <div className="modal-form__group">
-            <label className="modal-form__label">Profile Photo</label>
-            <div className="customers__photo-upload">
-              <div className="customers__photo-preview customers__photo-preview--has-image">
-                <img 
-                  src={selectedMember?.avatar || '/images/user-icon-placeholder.png'} 
-                  alt={selectedMember?.name || 'Preview'} 
-                />
-                {selectedMember?.avatar && (
-                  <button className="customers__photo-remove">×</button>
-                )}
-              </div>
-              <div className="customers__photo-dropzone">
-                <Upload size={24} />
-                <span>Click to upload or drag and drop</span>
-                <span className="customers__photo-hint">PNG, JPG, JPEG Up to 5MB</span>
-              </div>
-            </div>
-            <span className="modal-form__hint">Recommended: Square image, minimum 300x300px for best quality</span>
+            <label className="modal-form__label">Profile Photo URL</label>
+            <input
+              type="text"
+              className="modal-form__input"
+              placeholder="https://example.com/avatar.jpg"
+              value={formData.avatarUrl}
+              onChange={(e) => setFormData({ ...formData, avatarUrl: e.target.value })}
+            />
           </div>
 
           {/* Account Information */}
           <h3 className="customers__form-section">Account Information</h3>
-          <div className="modal-form__row">
-            <div className="modal-form__group">
-              <label className="modal-form__label modal-form__label--required">Email</label>
-              <input
-                type="email"
-                className="modal-form__input"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              />
-            </div>
-            <div className="modal-form__group">
-              <label className="modal-form__label modal-form__label--required">Password</label>
-              <div className="customers__password-field">
-                <input
-                  type="password"
-                  className="modal-form__input"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                />
-                <Eye size={18} className="customers__password-toggle" />
-              </div>
-            </div>
+          <div className="modal-form__group">
+            <label className="modal-form__label modal-form__label--required">Email</label>
+            <input
+              type="email"
+              className="modal-form__input"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            />
           </div>
 
           {/* Personal Information */}
@@ -560,18 +667,18 @@ function Customers({ userRole, currentUserId }: CustomersProps) {
             <input
               type="text"
               className="modal-form__input"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              value={formData.fullname}
+              onChange={(e) => setFormData({ ...formData, fullname: e.target.value })}
             />
           </div>
           <div className="modal-form__row">
             <div className="modal-form__group">
-              <label className="modal-form__label modal-form__label--required">Date of birth</label>
+              <label className="modal-form__label modal-form__label--required">Date of Birth</label>
               <input
-                type="text"
+                type="date"
                 className="modal-form__input"
-                value={formData.dateOfBirth}
-                onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
+                value={formData.dob}
+                onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
               />
             </div>
             <div className="modal-form__group">
@@ -579,26 +686,25 @@ function Customers({ userRole, currentUserId }: CustomersProps) {
               <select
                 className="modal-form__select"
                 value={formData.gender}
-                onChange={(e) => setFormData({ ...formData, gender: e.target.value as Gender })}
+                onChange={(e) => setFormData({ ...formData, gender: e.target.value as GenderEnum })}
               >
-                <option value="">Select Type</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="other">Other</option>
+                <option value="">Select Gender</option>
+                <option value="MALE">Male</option>
+                <option value="FEMALE">Female</option>
               </select>
             </div>
           </div>
           <div className="modal-form__group">
-            <label className="modal-form__label modal-form__label--required">Phone number</label>
+            <label className="modal-form__label modal-form__label--required">Phone Number</label>
             <input
               type="tel"
               className="modal-form__input"
-              value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              value={formData.phoneNumber}
+              onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
             />
           </div>
           <div className="modal-form__group">
-            <label className="modal-form__label modal-form__label--required">CCCD</label>
+            <label className="modal-form__label modal-form__label--required">CCCD (Citizen ID)</label>
             <input
               type="text"
               className="modal-form__input"
@@ -609,119 +715,91 @@ function Customers({ userRole, currentUserId }: CustomersProps) {
         </div>
       </Modal>
 
-      {/* Contract Details Modal */}
+      {/* View Member Details Modal */}
       <Modal
-        isOpen={showContractModal}
-        onClose={() => { setShowContractModal(false); setSelectedContract(null); }}
-        title="Contract Details"
-        size="lg"
+        isOpen={showViewModal}
+        onClose={() => { setShowViewModal(false); setSelectedMember(null); }}
+        title="Member Details"
+        size="md"
       >
-        {selectedContract && (
-          <div className="customers__contract-modal">
-            <div className="customers__contract-modal-section">
-              <h3 className="customers__contract-modal-title">Contract Information</h3>
-              <div className="customers__contract-modal-grid">
-                <div className="customers__contract-modal-item">
-                  <span className="customers__contract-modal-label">Contract ID</span>
-                  <span className="customers__contract-modal-value">{selectedContract.id}</span>
-                </div>
-                <div className="customers__contract-modal-item">
-                  <span className="customers__contract-modal-label">Status</span>
-                  <span className={`customers__contract-status-badge customers__contract-status-badge--${selectedContract.status}`}>
-                    {selectedContract.status}
-                  </span>
-                </div>
-                <div className="customers__contract-modal-item">
-                  <span className="customers__contract-modal-label">Package</span>
-                  <span className="customers__contract-modal-value">{selectedContract.packageName}</span>
-                </div>
-                <div className="customers__contract-modal-item">
-                  <span className="customers__contract-modal-label">Duration</span>
-                  <span className="customers__contract-modal-value">{selectedContract.duration} days</span>
-                </div>
+        {selectedMember && (
+          <div className="customers__view-modal">
+            <div className="customers__view-header">
+              <div className="customers__view-avatar">
+                <img 
+                  src={selectedMember.user.avatarUrl || '/images/user-icon-placeholder.png'} 
+                  alt={selectedMember.user.fullname}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/images/user-icon-placeholder.png';
+                  }}
+                />
+              </div>
+              <div className="customers__view-title">
+                <h3>{selectedMember.user.fullname}</h3>
+                <span className={`customers__status ${getStatusBadge(selectedMember.user.status).className}`}>
+                  {getStatusBadge(selectedMember.user.status).label}
+                </span>
               </div>
             </div>
 
-            <div className="customers__contract-modal-section">
-              <h3 className="customers__contract-modal-title">Member Information</h3>
-              <div className="customers__contract-modal-profile">
-                <div className="customers__contract-modal-avatar">
-                  {selectedContract.memberAvatar ? (
-                    <img src={selectedContract.memberAvatar} alt={selectedContract.memberName} />
-                  ) : (
-                    <img src="/images/user-icon-placeholder.png" alt="Member" />
-                  )}
-                </div>
-                <div>
-                  <div className="customers__contract-modal-name">{selectedContract.memberName}</div>
-                  <div className="customers__contract-modal-id">ID: {selectedContract.memberId}</div>
-                </div>
+            <div className="customers__view-grid">
+              <div className="customers__view-item">
+                <span className="customers__view-label">Member ID</span>
+                <span className="customers__view-value">#{selectedMember.id}</span>
               </div>
-            </div>
-
-            {selectedContract.trainerName && (
-              <div className="customers__contract-modal-section">
-                <h3 className="customers__contract-modal-title">Trainer Information</h3>
-                <div className="customers__contract-modal-profile">
-                  <div className="customers__contract-modal-avatar">
-                    {selectedContract.trainerAvatar ? (
-                      <img src={selectedContract.trainerAvatar} alt={selectedContract.trainerName} />
-                    ) : (
-                      <img src="/images/user-icon-placeholder.png" alt="Trainer" />
-                    )}
-                  </div>
-                  <div>
-                    <div className="customers__contract-modal-name">{selectedContract.trainerName}</div>
-                    <div className="customers__contract-modal-id">ID: {selectedContract.trainerId}</div>
-                  </div>
-                </div>
+              <div className="customers__view-item">
+                <span className="customers__view-label">Email</span>
+                <span className="customers__view-value">{selectedMember.user.email}</span>
               </div>
-            )}
-
-            <div className="customers__contract-modal-section">
-              <h3 className="customers__contract-modal-title">Contract Details</h3>
-              <div className="customers__contract-modal-grid">
-                <div className="customers__contract-modal-item">
-                  <span className="customers__contract-modal-label">Start Date</span>
-                  <span className="customers__contract-modal-value">{selectedContract.startDate}</span>
-                </div>
-                <div className="customers__contract-modal-item">
-                  <span className="customers__contract-modal-label">End Date</span>
-                  <span className="customers__contract-modal-value">{selectedContract.endDate}</span>
-                </div>
-                <div className="customers__contract-modal-item">
-                  <span className="customers__contract-modal-label">Total Sessions</span>
-                  <span className="customers__contract-modal-value">
-                    {selectedContract.sessions === 'unlimited' ? 'Unlimited' : selectedContract.sessions}
-                  </span>
-                </div>
-                <div className="customers__contract-modal-item">
-                  <span className="customers__contract-modal-label">Completed Sessions</span>
-                  <span className="customers__contract-modal-value">{selectedContract.completedSessions}</span>
-                </div>
-                <div className="customers__contract-modal-item">
-                  <span className="customers__contract-modal-label">Price</span>
-                  <span className="customers__contract-modal-value">
-                    {selectedContract.price.toLocaleString('vi-VN')}đ
-                  </span>
-                </div>
-                <div className="customers__contract-modal-item">
-                  <span className="customers__contract-modal-label">Payment Method</span>
-                  <span className="customers__contract-modal-value" style={{ textTransform: 'capitalize' }}>
-                    {selectedContract.paymentMethod}
-                  </span>
-                </div>
+              <div className="customers__view-item">
+                <span className="customers__view-label">Phone</span>
+                <span className="customers__view-value">{selectedMember.user.phoneNumber}</span>
               </div>
-              {selectedContract.notes && (
-                <div className="customers__contract-modal-notes">
-                  <span className="customers__contract-modal-label">Notes</span>
-                  <p className="customers__contract-modal-notes-text">{selectedContract.notes}</p>
-                </div>
-              )}
+              <div className="customers__view-item">
+                <span className="customers__view-label">CCCD</span>
+                <span className="customers__view-value">{selectedMember.cccd}</span>
+              </div>
+              <div className="customers__view-item">
+                <span className="customers__view-label">Date of Birth</span>
+                <span className="customers__view-value">{formatDateDisplay(selectedMember.user.dob)}</span>
+              </div>
+              <div className="customers__view-item">
+                <span className="customers__view-label">Gender</span>
+                <span className="customers__view-value">{getGenderDisplay(selectedMember.user.gender)}</span>
+              </div>
+              <div className="customers__view-item">
+                <span className="customers__view-label">Join Date</span>
+                <span className="customers__view-value">{formatDateDisplay(selectedMember.joinDate)}</span>
+              </div>
+              <div className="customers__view-item">
+                <span className="customers__view-label">Money Spent</span>
+                <span className="customers__view-value">{selectedMember.moneySpent.toLocaleString('vi-VN')}đ</span>
+              </div>
+              <div className="customers__view-item">
+                <span className="customers__view-label">Money Debt</span>
+                <span className="customers__view-value">{selectedMember.moneyDebt.toLocaleString('vi-VN')}đ</span>
+              </div>
+              <div className="customers__view-item">
+                <span className="customers__view-label">Created At</span>
+                <span className="customers__view-value">{new Date(selectedMember.createdAt).toLocaleString('vi-VN')}</span>
+              </div>
             </div>
           </div>
         )}
       </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => { setShowDeleteModal(false); setSelectedMember(null); }}
+        onConfirm={handleDeleteMember}
+        title="Delete Member"
+        message={`Are you sure you want to delete "${selectedMember?.user.fullname}"? This will set their status to inactive.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={isSubmitting}
+      />
     </div>
   );
 }
