@@ -205,3 +205,96 @@ export interface ReqUpdatePackageDTO {
   durationInDays: number;
   numberOfSessions: number;
 }
+// ===== Common Pagination DTO =====
+
+export interface ResultPaginationDTO<T = any> {
+  meta: {
+    page: number;
+    pageSize: number;
+    totalPages: number;
+    totalItems: number;
+  };
+  result: T[];
+}
+
+// ===== Body Metrics =====
+
+export interface ApiBodyMetric {
+  id: number;
+
+  member: {
+    memberId: number;
+    fullname: string;
+  };
+
+  measuredBy: {
+    userId: number;
+    fullname: string;
+  } | null;
+
+  measuredDate: string; // LocalDate (YYYY-MM-DD)
+
+  weight: number;
+  height: number;
+  muscleMass: number;
+  bodyFatPercentage: number;
+  bmi: number;
+
+  createdAt: string; // Instant
+  updatedAt: string; // Instant
+  createdBy: string;
+  updatedBy: string;
+}
+
+export interface ReqCreateBodyMetricDTO {
+  memberId: number;
+  measuredById?: number;
+  measuredDate: string;
+
+  weight: number;
+  height: number;
+  muscleMass?: number;
+  bodyFatPercentage?: number;
+  bmi?: number;
+}
+
+export interface ReqUpdateBodyMetricDTO {
+  measuredDate?: string;
+
+  weight?: number;
+  height?: number;
+  muscleMass?: number;
+  bodyFatPercentage?: number;
+  bmi?: number;
+}
+
+// ===== Additional Service =====
+
+export interface ApiAdditionalService {
+  id: number;
+  name: string;
+  costPrice: number;
+  suggestSellPrice: number;
+  description: string;
+  isActive: boolean;
+
+  createdAt: string; // Instant
+  updatedAt: string; // Instant
+  createdBy: string;
+  updatedBy: string;
+}
+
+export interface ReqCreateAdditionalServiceDTO {
+  name: string;
+  costPrice: number;
+  suggestSellPrice: number;
+  description?: string;
+}
+
+export interface ReqUpdateAdditionalServiceDTO {
+  name?: string;
+  costPrice?: number;
+  suggestSellPrice?: number;
+  description?: string;
+  isActive?: boolean;
+}
