@@ -8,6 +8,7 @@ export { default as PersonalTrainers } from './PersonalTrainers/index.ts';
 export { default as Workouts } from './Workouts/index.ts';
 export { default as Diets } from './Diets/index.ts';
 export { default as AdditionalServices } from './AdditionalServices/index.ts';
+export { default as BodyMetrics } from './BodyMetrics/index.ts';
 export { default as Payments } from './Payments/index.ts';
 export { default as Inventory } from './Inventory/index.ts';
 export { default as Report } from './Report/index.ts';

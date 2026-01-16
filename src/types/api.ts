@@ -298,3 +298,111 @@ export interface ReqUpdateAdditionalServiceDTO {
   description?: string;
   isActive?: boolean;
 }
+
+// ===== Food Types =====
+
+export type FoodTypeEnum = 'PROTEIN' | 'CARBOHYDRATE' | 'FAT';
+
+export const FoodType = {
+  PROTEIN: 'PROTEIN' as FoodTypeEnum,
+  CARBOHYDRATE: 'CARBOHYDRATE' as FoodTypeEnum,
+  FAT: 'FAT' as FoodTypeEnum
+};
+
+export interface ApiFood {
+  id: number;
+  name: string;
+  description: string;
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+  note: string;
+  type: FoodTypeEnum;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+export interface ReqCreateFoodDTO {
+  name: string;
+  description?: string;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+  note?: string;
+}
+
+export interface ReqUpdateFoodDTO {
+  name?: string;
+  description?: string;
+  proteinG?: number;
+  carbsG?: number;
+  fatG?: number;
+  note?: string;
+}
+
+// ===== Daily Diet Types =====
+
+export interface ApiDietDetail {
+  dietId: number;
+  foodId: number;
+  foodName: string;
+  prepMethod: string;
+  amount: number;
+  note: string;
+  caloriesPer100g: number;
+  proteinPer100g: number;
+  carbsPer100g: number;
+  fatPer100g: number;
+  totalCalories: number;
+  totalProteinG: number;
+  totalCarbsG: number;
+  totalFatG: number;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+export interface ApiDailyDiet {
+  id: number;
+  memberId: number;
+  memberName: string;
+  ptId: number;
+  ptName: string;
+  dietDate: string;
+  waterLiters: number;
+  note: string;
+  dietDetails: ApiDietDetail[];
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+export interface ReqCreateDailyDietDTO {
+  memberId: number;
+  ptId: number;
+  dietDate: string;
+  waterLiters: number;
+  note?: string;
+}
+
+export interface ReqUpdateDailyDietDTO {
+  ptId?: number;
+  dietDate?: string;
+  waterLiters?: number;
+  note?: string;
+}
+
+// ===== Diet Detail Types =====
+
+export interface ReqCreateDietDetailDTO {
+  dietId: number;
+  foodId: number;
+  prepMethod?: string;
+  amount: number;
+  note?: string;
+}
+
+export interface ReqUpdateDietDetailDTO {
+  prepMethod?: string;
+  amount?: number;
+  note?: string;
+}

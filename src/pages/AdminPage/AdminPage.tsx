@@ -18,6 +18,7 @@ import {
   Workouts,
   Diets,
   AdditionalServices,
+  BodyMetrics,
   Payments,
   Inventory,
   Report
@@ -105,7 +106,9 @@ function AdminPage() {
       case 'diets':
         return <Diets userRole="admin" />;
       case 'additional-services':
-        return <AdditionalServices onNavigateToPayments={() => setActiveTab('payments')} />;
+        return <AdditionalServices userRole="admin" />;
+      case 'body-metrics':
+        return <BodyMetrics userRole="admin" />;
       case 'payments':
         return <Payments />;
       case 'inventory':

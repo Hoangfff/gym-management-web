@@ -14,6 +14,7 @@ import {
   Customers,
   Workouts,
   Diets,
+  BodyMetrics,
   Report
 } from '../../components/dashboard/index.ts';
 import type { ActiveMember } from '../../types/index.ts';
@@ -89,6 +90,8 @@ function PTPage() {
         return <Workouts userRole="pt" currentUserId="pt-1" />;
       case 'diets':
         return <Diets userRole="pt" currentUserId="pt-1" />;
+      case 'body-metrics':
+        return <BodyMetrics userRole="pt" />;
       case 'report':
         return <Report />;
       default:

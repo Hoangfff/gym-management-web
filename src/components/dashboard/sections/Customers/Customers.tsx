@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Search, ChevronDown, Pencil, Trash2, Eye, RefreshCw } from 'lucide-react';
+import { Search, ChevronDown, Pencil, Trash2, Eye, RefreshCw, Activity } from 'lucide-react';
 import Modal from '../../Modal/index.ts';
 import { ConfirmModal, useToast } from '../../../ui/index.ts';
-import { memberApi } from '../../../../services/index.ts';
-import type { ApiMember, GenderEnum, ReqCreateMemberDTO, ReqUpdateMemberDTO } from '../../../../types/api.ts';
+import { memberApi, bodyMetricsApi } from '../../../../services/index.ts';
+import type { ApiMember, GenderEnum, ReqCreateMemberDTO, ReqUpdateMemberDTO, ApiBodyMetric } from '../../../../types/api.ts';
 import './Customers.css';
 
 interface CustomersProps {
@@ -51,8 +51,11 @@ function Customers({ userRole, currentUserId }: CustomersProps) {
   
   // Data state
   const [members, setMembers] = useState<ApiMember[]>([]);
+  const [memberBodyMetrics, setMemberBodyMetrics] = useState<ApiBodyMetric[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMetrics, setIsLoadingMetrics] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [viewModalTab, setViewModalTab] = useState<'details' | 'metrics'>('details');
   
   // Filter/pagination state
   const [searchTerm, setSearchTerm] = useState('');
@@ -144,11 +147,29 @@ function Customers({ userRole, currentUserId }: CustomersProps) {
     try {
       const response = await memberApi.search({ memberId: member.id });
       setSelectedMember(response.data);
+      setViewModalTab('details');
       setShowViewModal(true);
+      // Fetch body metrics
+      fetchMemberBodyMetrics(member.id);
     } catch (error) {
       console.error('Failed to fetch member details:', error);
       setSelectedMember(member);
+      setViewModalTab('details');
       setShowViewModal(true);
+      fetchMemberBodyMetrics(member.id);
+    }
+  };
+
+  const fetchMemberBodyMetrics = async (memberId: number) => {
+    setIsLoadingMetrics(true);
+    try {
+      const response = await bodyMetricsApi.getByMemberId(memberId);
+      setMemberBodyMetrics(response.data);
+    } catch (error) {
+      console.error('Failed to fetch body metrics:', error);
+      setMemberBodyMetrics([]);
+    } finally {
+      setIsLoadingMetrics(false);
     }
   };
 
@@ -718,7 +739,12 @@ function Customers({ userRole, currentUserId }: CustomersProps) {
       {/* View Member Details Modal */}
       <Modal
         isOpen={showViewModal}
-        onClose={() => { setShowViewModal(false); setSelectedMember(null); }}
+        onClose={() => { 
+          setShowViewModal(false); 
+          setSelectedMember(null); 
+          setMemberBodyMetrics([]);
+          setViewModalTab('details');
+        }}
         title="Member Details"
         size="md"
       >
@@ -742,48 +768,139 @@ function Customers({ userRole, currentUserId }: CustomersProps) {
               </div>
             </div>
 
-            <div className="customers__view-grid">
-              <div className="customers__view-item">
-                <span className="customers__view-label">Member ID</span>
-                <span className="customers__view-value">#{selectedMember.id}</span>
-              </div>
-              <div className="customers__view-item">
-                <span className="customers__view-label">Email</span>
-                <span className="customers__view-value">{selectedMember.user.email}</span>
-              </div>
-              <div className="customers__view-item">
-                <span className="customers__view-label">Phone</span>
-                <span className="customers__view-value">{selectedMember.user.phoneNumber}</span>
-              </div>
-              <div className="customers__view-item">
-                <span className="customers__view-label">CCCD</span>
-                <span className="customers__view-value">{selectedMember.cccd}</span>
-              </div>
-              <div className="customers__view-item">
-                <span className="customers__view-label">Date of Birth</span>
-                <span className="customers__view-value">{formatDateDisplay(selectedMember.user.dob)}</span>
-              </div>
-              <div className="customers__view-item">
-                <span className="customers__view-label">Gender</span>
-                <span className="customers__view-value">{getGenderDisplay(selectedMember.user.gender)}</span>
-              </div>
-              <div className="customers__view-item">
-                <span className="customers__view-label">Join Date</span>
-                <span className="customers__view-value">{formatDateDisplay(selectedMember.joinDate)}</span>
-              </div>
-              <div className="customers__view-item">
-                <span className="customers__view-label">Money Spent</span>
-                <span className="customers__view-value">{selectedMember.moneySpent.toLocaleString('vi-VN')}đ</span>
-              </div>
-              <div className="customers__view-item">
-                <span className="customers__view-label">Money Debt</span>
-                <span className="customers__view-value">{selectedMember.moneyDebt.toLocaleString('vi-VN')}đ</span>
-              </div>
-              <div className="customers__view-item">
-                <span className="customers__view-label">Created At</span>
-                <span className="customers__view-value">{new Date(selectedMember.createdAt).toLocaleString('vi-VN')}</span>
-              </div>
+            {/* Tabs */}
+            <div className="customers__view-tabs">
+              <button
+                className={`customers__view-tab ${viewModalTab === 'details' ? 'customers__view-tab--active' : ''}`}
+                onClick={() => setViewModalTab('details')}
+              >
+                Details
+              </button>
+              <button
+                className={`customers__view-tab ${viewModalTab === 'metrics' ? 'customers__view-tab--active' : ''}`}
+                onClick={() => setViewModalTab('metrics')}
+              >
+                <Activity size={16} />
+                Body Metrics ({memberBodyMetrics.length})
+              </button>
             </div>
+
+            {/* Details Tab */}
+            {viewModalTab === 'details' && (
+              <div className="customers__view-grid">
+                <div className="customers__view-item">
+                  <span className="customers__view-label">Member ID</span>
+                  <span className="customers__view-value">#{selectedMember.id}</span>
+                </div>
+                <div className="customers__view-item">
+                  <span className="customers__view-label">Email</span>
+                  <span className="customers__view-value">{selectedMember.user.email}</span>
+                </div>
+                <div className="customers__view-item">
+                  <span className="customers__view-label">Phone</span>
+                  <span className="customers__view-value">{selectedMember.user.phoneNumber}</span>
+                </div>
+                <div className="customers__view-item">
+                  <span className="customers__view-label">CCCD</span>
+                  <span className="customers__view-value">{selectedMember.cccd}</span>
+                </div>
+                <div className="customers__view-item">
+                  <span className="customers__view-label">Date of Birth</span>
+                  <span className="customers__view-value">{formatDateDisplay(selectedMember.user.dob)}</span>
+                </div>
+                <div className="customers__view-item">
+                  <span className="customers__view-label">Gender</span>
+                  <span className="customers__view-value">{getGenderDisplay(selectedMember.user.gender)}</span>
+                </div>
+                <div className="customers__view-item">
+                  <span className="customers__view-label">Join Date</span>
+                  <span className="customers__view-value">{formatDateDisplay(selectedMember.joinDate)}</span>
+                </div>
+                <div className="customers__view-item">
+                  <span className="customers__view-label">Money Spent</span>
+                  <span className="customers__view-value">{selectedMember.moneySpent.toLocaleString('vi-VN')}đ</span>
+                </div>
+                <div className="customers__view-item">
+                  <span className="customers__view-label">Money Debt</span>
+                  <span className="customers__view-value">{selectedMember.moneyDebt.toLocaleString('vi-VN')}đ</span>
+                </div>
+                <div className="customers__view-item">
+                  <span className="customers__view-label">Created At</span>
+                  <span className="customers__view-value">{new Date(selectedMember.createdAt).toLocaleString('vi-VN')}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Body Metrics Tab */}
+            {viewModalTab === 'metrics' && (
+              <div className="customers__metrics-tab">
+                {isLoadingMetrics ? (
+                  <div className="customers__metrics-loading">
+                    <RefreshCw size={24} className="spinning" />
+                    <p>Loading body metrics...</p>
+                  </div>
+                ) : memberBodyMetrics.length === 0 ? (
+                  <div className="customers__metrics-empty">
+                    <Activity size={48} />
+                    <h4>No body metrics recorded</h4>
+                    <p>This member has no body measurement records yet.</p>
+                  </div>
+                ) : (
+                  <div className="customers__metrics-list">
+                    {memberBodyMetrics.map((metric) => (
+                      <div key={metric.id} className="customers__metric-card">
+                        <div className="customers__metric-header">
+                          <span className="customers__metric-date">
+                            {formatDateDisplay(metric.measuredDate)}
+                          </span>
+                          {metric.measuredBy && (
+                            <span className="customers__metric-by">
+                              by {metric.measuredBy.fullname}
+                            </span>
+                          )}
+                        </div>
+                        <div className="customers__metric-grid">
+                          <div className="customers__metric-item">
+                            <span className="customers__metric-label">Weight</span>
+                            <span className="customers__metric-value customers__metric-value--weight">
+                              {metric.weight} kg
+                            </span>
+                          </div>
+                          <div className="customers__metric-item">
+                            <span className="customers__metric-label">Height</span>
+                            <span className="customers__metric-value">
+                              {metric.height} cm
+                            </span>
+                          </div>
+                          <div className="customers__metric-item">
+                            <span className="customers__metric-label">BMI</span>
+                            <span className="customers__metric-value customers__metric-value--bmi">
+                              {metric.bmi.toFixed(1)}
+                            </span>
+                          </div>
+                          {metric.bodyFatPercentage > 0 && (
+                            <div className="customers__metric-item">
+                              <span className="customers__metric-label">Body Fat</span>
+                              <span className="customers__metric-value customers__metric-value--fat">
+                                {metric.bodyFatPercentage}%
+                              </span>
+                            </div>
+                          )}
+                          {metric.muscleMass > 0 && (
+                            <div className="customers__metric-item">
+                              <span className="customers__metric-label">Muscle Mass</span>
+                              <span className="customers__metric-value customers__metric-value--muscle">
+                                {metric.muscleMass} kg
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </Modal>

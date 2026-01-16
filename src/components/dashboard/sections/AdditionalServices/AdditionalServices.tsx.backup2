@@ -1,0 +1,972 @@
+import { useState, useEffect } from 'react';
+import { Pencil, Trash2, Search, RefreshCw, Upload, X, DollarSign, Check, Power, PowerOff, Eye } from 'lucide-react';
+import Modal from '../../Modal/index.ts';
+import { ConfirmModal, useToast } from '../../../ui/index.ts';
+import { additionalServiceApi, memberApi } from '../../../../services/index.ts';
+import type { ApiAdditionalService, ReqCreateAdditionalServiceDTO, ReqUpdateAdditionalServiceDTO, ApiMember } from '../../../../types/api.ts';
+import './AdditionalServices.css';
+
+interface AdditionalServicesProps {
+  onNavigateToPayments?: () => void;
+}
+
+const CATEGORIES = [
+  { value: 'all', label: 'All' },
+  { value: 'wellness', label: 'Wellness' },
+  { value: 'recovery', label: 'Recovery' },
+  { value: 'assessment', label: 'Assessment' },
+  { value: 'other', label: 'Other' }
+];
+
+function AdditionalServices({ onNavigateToPayments }: AdditionalServicesProps) {
+  const { showToast } = useToast();
+
+  // Data state
+  const [services, setServices] = useState<ApiAdditionalService[]>([]);
+  const [members, setMembers] = useState<ApiMember[]>([]);
+  const [isLoadingServices, setIsLoadingServices] = useState(true);
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Filter state
+  const [activeCategory, setActiveCategory] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Modal state
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showOrderModal, setShowOrderModal] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedService, setSelectedService] = useState<ApiAdditionalService | null>(null);
+  const [orderPaymentId, setOrderPaymentId] = useState('');
+
+  // Form state
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    category: '',
+    price: '',
+    imageUrl: '',
+    isActive: true
+  });
+
+  // Order state
+  const [orderData, setOrderData] = useState({
+    quantity: 1,
+    memberId: 0,
+    memberName: ''
+  });
+
+  const [memberSearchTerm, setMemberSearchTerm] = useState('');
+  const [memberPage, setMemberPage] = useState(1);
+
+  // Fetch data on mount
+  useEffect(() => {
+    fetchServices();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const fetchServices = async () => {
+    setIsLoadingServices(true);
+    try {
+      const response = await additionalServiceApi.getAll();
+      setServices(response.data);
+    } catch (error) {
+      console.error('Failed to fetch services:', error);
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: 'Không thể tải danh sách dịch vụ'
+      });
+    } finally {
+      setIsLoadingServices(false);
+    }
+  };
+
+  const fetchMembers = async () => {
+    if (members.length > 0) return; // Already loaded
+    setIsLoadingMembers(true);
+    try {
+      const response = await memberApi.getAllActive();
+      setMembers(response.data);
+    } catch (error) {
+      console.error('Failed to fetch members:', error);
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: 'Không thể tải danh sách thành viên'
+      });
+    } finally {
+      setIsLoadingMembers(false);
+    }
+  };
+
+  // Stats
+  const totalServices = services.length;
+  const activeServices = services.filter(s => s.isActive).length;
+  const totalRevenue = services.reduce((sum, s) => sum + s.price, 0);
+
+  // Filtered services
+  const filteredServices = services.filter(service => {
+    const matchesCategory = activeCategory === 'all' || service.category === activeCategory;
+    const matchesSearch = !searchQuery || service.name.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
+
+  // Member pagination
+  const filteredMembers = members.filter(m =>
+    m.user.fullname.toLowerCase().includes(memberSearchTerm.toLowerCase()) ||
+    m.id.toString().includes(memberSearchTerm)
+  );
+  const paginatedMembers = filteredMembers.slice((memberPage - 1) * 4, memberPage * 4);
+  const totalMemberPages = Math.ceil(filteredMembers.length / 4);
+
+  const handleAddService = async () => {
+    if (!formData.name || !formData.price || !formData.category) {
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: 'Vui lòng điền đầy đủ thông tin bắt buộc'
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const requestData: ReqCreateAdditionalServiceDTO = {
+        name: formData.name,
+        description: formData.description,
+        category: formData.category,
+        price: parseFloat(formData.price),
+        imageUrl: formData.imageUrl,
+        isActive: formData.isActive
+      };
+
+      await additionalServiceApi.create(requestData);
+
+      showToast({
+        type: 'success',
+        title: 'Thành công',
+        message: 'Đã thêm dịch vụ mới'
+      });
+
+      setShowAddModal(false);
+      resetForm();
+      fetchServices();
+    } catch (error: unknown) {
+      console.error('Failed to create service:', error);
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: axiosError.response?.data?.message || 'Không thể thêm dịch vụ'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUpdateService = async () => {
+    if (!selectedService) return;
+
+    setIsSubmitting(true);
+    try {
+      const requestData: ReqUpdateAdditionalServiceDTO = {
+        name: formData.name,
+        description: formData.description,
+        category: formData.category,
+        price: parseFloat(formData.price),
+        imageUrl: formData.imageUrl,
+        isActive: formData.isActive
+      };
+
+      await additionalServiceApi.update(selectedService.id, requestData);
+
+      showToast({
+        type: 'success',
+        title: 'Thành công',
+        message: 'Đã cập nhật dịch vụ'
+      });
+
+      setShowEditModal(false);
+      setSelectedService(null);
+      resetForm();
+      fetchServices();
+    } catch (error: unknown) {
+      console.error('Failed to update service:', error);
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: axiosError.response?.data?.message || 'Không thể cập nhật dịch vụ'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteService = async () => {
+    if (!selectedService) return;
+
+    setIsSubmitting(true);
+    try {
+      await additionalServiceApi.delete(selectedService.id);
+
+      showToast({
+        type: 'success',
+        title: 'Thành công',
+        message: `Đã xóa dịch vụ ${selectedService.name}`
+      });
+
+      setShowDeleteModal(false);
+      setSelectedService(null);
+      fetchServices();
+    } catch (error: unknown) {
+      console.error('Failed to delete service:', error);
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: axiosError.response?.data?.message || 'Không thể xóa dịch vụ'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleActivate = async (service: ApiAdditionalService) => {
+    try {
+      await additionalServiceApi.activate(service.id);
+      showToast({
+        type: 'success',
+        title: 'Thành công',
+        message: `Đã kích hoạt ${service.name}`
+      });
+      fetchServices();
+    } catch (error: unknown) {
+      console.error('Failed to activate service:', error);
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: axiosError.response?.data?.message || 'Không thể kích hoạt dịch vụ'
+      });
+    }
+  };
+
+  const handleDeactivate = async (service: ApiAdditionalService) => {
+    try {
+      await additionalServiceApi.deactivate(service.id);
+      showToast({
+        type: 'success',
+        title: 'Thành công',
+        message: `Đã vô hiệu hóa ${service.name}`
+      });
+      fetchServices();
+    } catch (error: unknown) {
+      console.error('Failed to deactivate service:', error);
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: axiosError.response?.data?.message || 'Không thể vô hiệu hóa dịch vụ'
+      });
+    }
+  };
+
+  const handleViewService = async (service: ApiAdditionalService) => {
+    try {
+      const response = await additionalServiceApi.getById(service.id);
+      setSelectedService(response.data);
+      setShowViewModal(true);
+    } catch (error) {
+      console.error('Failed to fetch service details:', error);
+      setSelectedService(service);
+      setShowViewModal(true);
+    }
+  };
+
+  const openEditModal = (service: ApiAdditionalService) => {
+    setSelectedService(service);
+    setFormData({
+      name: service.name,
+      description: service.description || '',
+      category: service.category,
+      price: service.price.toString(),
+      imageUrl: service.imageUrl || '',
+      isActive: service.isActive
+    });
+    setShowEditModal(true);
+  };
+
+  const openDeleteModal = (service: ApiAdditionalService) => {
+    setSelectedService(service);
+    setShowDeleteModal(true);
+  };
+
+  const handleOrderClick = (service: ApiAdditionalService) => {
+    setSelectedService(service);
+    setOrderData({ quantity: 1, memberId: 0, memberName: '' });
+    setMemberSearchTerm('');
+    setMemberPage(1);
+    setShowOrderModal(true);
+    fetchMembers();
+  };
+
+  const selectMember = (member: ApiMember) => {
+    setOrderData({ ...orderData, memberId: member.id, memberName: member.user.fullname });
+  };
+
+  const submitOrder = () => {
+    if (!orderData.memberId) {
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: 'Vui lòng chọn thành viên'
+      });
+      return;
+    }
+
+    // Generate payment ID
+    const paymentId = `PAY-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    setOrderPaymentId(paymentId);
+    setShowOrderModal(false);
+    setShowConfirmModal(true);
+
+    showToast({
+      type: 'success',
+      title: 'Thành công',
+      message: 'Đơn hàng đã được tạo'
+    });
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      description: '',
+      category: '',
+      price: '',
+      imageUrl: '',
+      isActive: true
+    });
+    setSelectedService(null);
+  };
+
+  const formatCurrency = (value: number): string => {
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND'
+    }).format(value);
+  };
+
+  const formatDate = (dateString: string): string => {
+    return new Date(dateString).toLocaleDateString('vi-VN');
+  };
+
+  return (
+    <div className="services">
+      <div className="services__header">
+        <div>
+          <h1 className="services__title">Additional Services</h1>
+          <p className="services__subtitle">Manage extra services and amenities</p>
+        </div>
+        <div className="services__header-actions">
+          <button
+            className="services__refresh-btn"
+            onClick={fetchServices}
+            disabled={isLoadingServices}
+            title="Refresh"
+          >
+            <RefreshCw size={18} className={isLoadingServices ? 'spinning' : ''} />
+          </button>
+          <button className="services__add-btn" onClick={() => setShowAddModal(true)}>
+            + Add New Service
+          </button>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="services__stats">
+        <div className="services__stat">
+          <span className="services__stat-label">Total Services</span>
+          <span className="services__stat-value">{totalServices}</span>
+        </div>
+        <div className="services__stat">
+          <span className="services__stat-label">Active Services</span>
+          <span className="services__stat-value">{activeServices}</span>
+        </div>
+        <div className="services__stat">
+          <span className="services__stat-label">Total Value</span>
+          <span className="services__stat-value">{formatCurrency(totalRevenue)}</span>
+        </div>
+      </div>
+
+      {/* Search & Category Filters */}
+      <div className="services__filters">
+        <div className="services__search">
+          <Search size={18} />
+          <input
+            type="text"
+            placeholder="Search services..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+        <div className="services__categories">
+          {CATEGORIES.map((cat) => (
+            <button
+              key={cat.value}
+              className={`services__category ${activeCategory === cat.value ? 'services__category--active' : ''}`}
+              onClick={() => setActiveCategory(cat.value)}
+            >
+              {cat.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Services Grid */}
+      {isLoadingServices ? (
+        <div className="services__loading">
+          <RefreshCw size={32} className="spinning" />
+          <p>Loading services...</p>
+        </div>
+      ) : filteredServices.length === 0 ? (
+        <div className="services__empty">No services found</div>
+      ) : (
+        <div className="services__grid">
+          {filteredServices.map((service) => (
+            <div key={service.id} className={`services__card ${!service.isActive ? 'services__card--inactive' : ''}`}>
+              <div className="services__card-header">
+                <div className="services__card-image">
+                  <img src={service.imageUrl || '/images/placeholder.jpg'} alt={service.name} />
+                </div>
+                <div className="services__card-info">
+                  <h3 className="services__card-name">{service.name}</h3>
+                  <p className="services__card-id">ID: #{service.id}</p>
+                  <span className={`services__card-badge services__card-badge--${service.category}`}>
+                    {service.category}
+                  </span>
+                </div>
+                <div className="services__card-actions">
+                  <button onClick={() => handleViewService(service)} title="View">
+                    <Eye size={16} />
+                  </button>
+                  <button onClick={() => openEditModal(service)} title="Edit">
+                    <Pencil size={16} />
+                  </button>
+                  {service.isActive ? (
+                    <button onClick={() => handleDeactivate(service)} title="Deactivate">
+                      <PowerOff size={16} />
+                    </button>
+                  ) : (
+                    <button onClick={() => handleActivate(service)} title="Activate">
+                      <Power size={16} />
+                    </button>
+                  )}
+                  <button className="services__card-action--delete" onClick={() => openDeleteModal(service)} title="Delete">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+
+              <p className="services__card-desc">{service.description || 'No description'}</p>
+
+              <div className="services__card-pricing">
+                <div className="services__card-price">
+                  <DollarSign size={16} />
+                  <span className="services__card-price-value">{formatCurrency(service.price)}</span>
+                </div>
+                <span className={`services__status services__status--${service.isActive ? 'active' : 'inactive'}`}>
+                  {service.isActive ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+
+              <div className="services__card-footer">
+                <button 
+                  className="services__order-btn" 
+                  onClick={() => handleOrderClick(service)}
+                  disabled={!service.isActive}
+                >
+                  Order
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add Service Modal */}
+      <Modal
+        isOpen={showAddModal}
+        onClose={() => { setShowAddModal(false); resetForm(); }}
+        title="Add New Service"
+        size="md"
+      >
+        <form className="modal-form" onSubmit={(e) => { e.preventDefault(); handleAddService(); }}>
+          <div className="modal-form__group">
+            <label className="modal-form__label">Service Photo URL</label>
+            <div className="modal-form__with-preview">
+              <input
+                type="url"
+                className="modal-form__input"
+                placeholder="https://example.com/image.jpg"
+                value={formData.imageUrl}
+                onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+              />
+              {formData.imageUrl && (
+                <div className="services__photo-preview">
+                  <img src={formData.imageUrl} alt="Preview" onError={(e) => { e.currentTarget.src = '/images/placeholder.jpg'; }} />
+                </div>
+              )}
+            </div>
+          </div>
+
+          <h3 className="services__form-section">Basic Information</h3>
+
+          <div className="modal-form__group">
+            <label className="modal-form__label modal-form__label--required">Service Name</label>
+            <input
+              type="text"
+              className="modal-form__input"
+              placeholder="e.g., Sports Massage"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              required
+            />
+          </div>
+
+          <div className="modal-form__group">
+            <label className="modal-form__label">Description</label>
+            <textarea
+              className="modal-form__textarea"
+              placeholder="Brief description of the service..."
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              rows={3}
+            />
+          </div>
+
+          <div className="modal-form__row">
+            <div className="modal-form__group">
+              <label className="modal-form__label modal-form__label--required">Category</label>
+              <select
+                className="modal-form__select"
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                required
+              >
+                <option value="">Select category</option>
+                {CATEGORIES.filter(c => c.value !== 'all').map(cat => (
+                  <option key={cat.value} value={cat.value}>{cat.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="modal-form__group">
+              <label className="modal-form__label modal-form__label--required">Price (VND)</label>
+              <input
+                type="number"
+                className="modal-form__input"
+                placeholder="50000"
+                value={formData.price}
+                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                required
+                min="0"
+              />
+            </div>
+          </div>
+
+          <div className="modal-form__actions">
+            <button
+              type="button"
+              className="modal-form__btn modal-form__btn--secondary"
+              onClick={() => { setShowAddModal(false); resetForm(); }}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="modal-form__btn modal-form__btn--primary"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Adding...' : 'Add Service'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Edit Service Modal */}
+      <Modal
+        isOpen={showEditModal}
+        onClose={() => { setShowEditModal(false); resetForm(); }}
+        title="Edit Service"
+        size="md"
+      >
+        <form className="modal-form" onSubmit={(e) => { e.preventDefault(); handleUpdateService(); }}>
+          <div className="modal-form__group">
+            <label className="modal-form__label">Service Photo URL</label>
+            <div className="modal-form__with-preview">
+              <input
+                type="url"
+                className="modal-form__input"
+                placeholder="https://example.com/image.jpg"
+                value={formData.imageUrl}
+                onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+              />
+              {formData.imageUrl && (
+                <div className="services__photo-preview">
+                  <img src={formData.imageUrl} alt="Preview" onError={(e) => { e.currentTarget.src = '/images/placeholder.jpg'; }} />
+                </div>
+              )}
+            </div>
+          </div>
+
+          <h3 className="services__form-section">Basic Information</h3>
+
+          <div className="modal-form__group">
+            <label className="modal-form__label modal-form__label--required">Service Name</label>
+            <input
+              type="text"
+              className="modal-form__input"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              required
+            />
+          </div>
+
+          <div className="modal-form__group">
+            <label className="modal-form__label">Description</label>
+            <textarea
+              className="modal-form__textarea"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              rows={3}
+            />
+          </div>
+
+          <div className="modal-form__row">
+            <div className="modal-form__group">
+              <label className="modal-form__label modal-form__label--required">Category</label>
+              <select
+                className="modal-form__select"
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                required
+              >
+                <option value="">Select category</option>
+                {CATEGORIES.filter(c => c.value !== 'all').map(cat => (
+                  <option key={cat.value} value={cat.value}>{cat.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="modal-form__group">
+              <label className="modal-form__label modal-form__label--required">Price (VND)</label>
+              <input
+                type="number"
+                className="modal-form__input"
+                value={formData.price}
+                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                required
+                min="0"
+              />
+            </div>
+          </div>
+
+          <div className="modal-form__checkbox">
+            <input
+              type="checkbox"
+              id="isActive"
+              checked={formData.isActive}
+              onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+            />
+            <label htmlFor="isActive">Active (available for booking)</label>
+          </div>
+
+          <div className="modal-form__actions">
+            <button
+              type="button"
+              className="modal-form__btn modal-form__btn--secondary"
+              onClick={() => { setShowEditModal(false); resetForm(); }}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="modal-form__btn modal-form__btn--primary"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Updating...' : 'Update Service'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* View Service Modal */}
+      <Modal
+        isOpen={showViewModal}
+        onClose={() => { setShowViewModal(false); setSelectedService(null); }}
+        title="Service Details"
+      >
+        {selectedService && (
+          <div className="services__view-modal">
+            {selectedService.imageUrl && (
+              <div className="services__view-image">
+                <img src={selectedService.imageUrl} alt={selectedService.name} onError={(e) => { e.currentTarget.src = '/images/placeholder.jpg'; }} />
+              </div>
+            )}
+            <div className="services__view-grid">
+              <div className="services__view-item">
+                <span className="services__view-label">ID</span>
+                <span className="services__view-value">#{selectedService.id}</span>
+              </div>
+              <div className="services__view-item">
+                <span className="services__view-label">Service Name</span>
+                <span className="services__view-value">{selectedService.name}</span>
+              </div>
+              <div className="services__view-item services__view-item--full">
+                <span className="services__view-label">Description</span>
+                <span className="services__view-value">{selectedService.description || '-'}</span>
+              </div>
+              <div className="services__view-item">
+                <span className="services__view-label">Category</span>
+                <span className={`services__card-badge services__card-badge--${selectedService.category}`}>
+                  {selectedService.category}
+                </span>
+              </div>
+              <div className="services__view-item">
+                <span className="services__view-label">Price</span>
+                <span className="services__view-value services__view-value--price">
+                  {formatCurrency(selectedService.price)}
+                </span>
+              </div>
+              <div className="services__view-item">
+                <span className="services__view-label">Status</span>
+                <span className={`services__status services__status--${selectedService.isActive ? 'active' : 'inactive'}`}>
+                  {selectedService.isActive ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+              <div className="services__view-item">
+                <span className="services__view-label">Created At</span>
+                <span className="services__view-value">{formatDate(selectedService.createdAt)}</span>
+              </div>
+              {selectedService.updatedAt && (
+                <div className="services__view-item">
+                  <span className="services__view-label">Updated At</span>
+                  <span className="services__view-value">{formatDate(selectedService.updatedAt)}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Order Modal */}
+      <Modal
+        isOpen={showOrderModal}
+        onClose={() => setShowOrderModal(false)}
+        title="Order Service"
+        size="md"
+      >
+        {selectedService && (
+          <div className="services__order-form">
+            <div className="services__order-service">
+              <div className="services__order-image">
+                <img src={selectedService.imageUrl || '/images/placeholder.jpg'} alt={selectedService.name} onError={(e) => { e.currentTarget.src = '/images/placeholder.jpg'; }} />
+              </div>
+              <div>
+                <h3 className="services__order-name">{selectedService.name}</h3>
+                <p className="services__order-desc">{selectedService.description}</p>
+              </div>
+            </div>
+
+            <div className="modal-form__group">
+              <label className="modal-form__label">Quantity</label>
+              <input
+                type="number"
+                className="modal-form__input"
+                min={1}
+                value={orderData.quantity}
+                onChange={(e) => setOrderData({ ...orderData, quantity: Number(e.target.value) })}
+              />
+            </div>
+
+            <div className="services__order-pricing">
+              <h4>Price Information</h4>
+              <div className="services__order-pricing-row">
+                <div className="services__order-pricing-item">
+                  <span>Unit price</span>
+                  <strong>{formatCurrency(selectedService.price)}</strong>
+                </div>
+                <div className="services__order-pricing-item">
+                  <span>Quantity</span>
+                  <strong>{orderData.quantity}</strong>
+                </div>
+              </div>
+              <div className="services__order-total">
+                <span>Total price</span>
+                <strong>{formatCurrency(selectedService.price * orderData.quantity)}</strong>
+              </div>
+            </div>
+
+            <div className="services__order-member">
+              <h4>Person receiving this service</h4>
+              <div className="modal-form__group">
+                <label className="modal-form__label modal-form__label--required">Selected User</label>
+                <input
+                  type="text"
+                  className="modal-form__input"
+                  value={orderData.memberName}
+                  readOnly
+                  placeholder="Select a member below"
+                />
+              </div>
+
+              <div className="services__member-select">
+                <div className="services__member-search">
+                  <Search size={16} />
+                  <input
+                    type="text"
+                    placeholder="Search by member name or ID..."
+                    value={memberSearchTerm}
+                    onChange={(e) => setMemberSearchTerm(e.target.value)}
+                  />
+                </div>
+
+                {isLoadingMembers ? (
+                  <div className="services__member-loading">
+                    <RefreshCw size={24} className="spinning" />
+                    <p>Loading members...</p>
+                  </div>
+                ) : (
+                  <>
+                    <table className="services__member-table">
+                      <thead>
+                        <tr>
+                          <th>Name</th>
+                          <th>Avatar</th>
+                          <th>Member ID</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {paginatedMembers.length === 0 ? (
+                          <tr>
+                            <td colSpan={4} className="services__member-empty">No members found</td>
+                          </tr>
+                        ) : (
+                          paginatedMembers.map((member) => (
+                            <tr 
+                              key={member.id}
+                              className={orderData.memberId === member.id ? 'services__member-row--selected' : ''}
+                              onClick={() => selectMember(member)}
+                            >
+                              <td>{member.user.fullname}</td>
+                              <td>
+                                <img 
+                                  src={member.user.avatarUrl || '/images/user-icon-placeholder.png'} 
+                                  alt={member.user.fullname}
+                                  className="services__member-avatar"
+                                  onError={(e) => { e.currentTarget.src = '/images/user-icon-placeholder.png'; }}
+                                />
+                              </td>
+                              <td>#{member.id}</td>
+                              <td>
+                                <span className={`services__status services__status--${member.user.status.toLowerCase()}`}>
+                                  {member.user.status}
+                                </span>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                    {totalMemberPages > 1 && (
+                      <div className="services__member-pagination">
+                        <button disabled={memberPage === 1} onClick={() => setMemberPage(p => p - 1)}>
+                          Previous
+                        </button>
+                        <span>Page {memberPage} of {totalMemberPages}</span>
+                        <button disabled={memberPage >= totalMemberPages} onClick={() => setMemberPage(p => p + 1)}>
+                          Next
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="modal-form__actions">
+              <button
+                type="button"
+                className="modal-form__btn modal-form__btn--secondary"
+                onClick={() => setShowOrderModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="modal-form__btn modal-form__btn--primary"
+                onClick={submitOrder}
+              >
+                Confirm Order
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Confirmation Modal */}
+      <Modal
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        title="Order Confirmed"
+        size="sm"
+      >
+        <div className="services__confirm">
+          <div className="services__confirm-icon">
+            <Check size={48} />
+          </div>
+          <h3 className="services__confirm-title">Order successful!</h3>
+          <p className="services__confirm-id">Payment ID: {orderPaymentId}</p>
+          <div className="services__confirm-actions">
+            <button 
+              className="modal-form__btn modal-form__btn--primary"
+              onClick={() => {
+                setShowConfirmModal(false);
+                onNavigateToPayments?.();
+              }}
+            >
+              Go to Payments
+            </button>
+            <button 
+              className="modal-form__btn modal-form__btn--secondary"
+              onClick={() => setShowConfirmModal(false)}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => { setShowDeleteModal(false); setSelectedService(null); }}
+        onConfirm={handleDeleteService}
+        title="Delete Service"
+        message={`Are you sure you want to delete "${selectedService?.name}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={isSubmitting}
+      />
+    </div>
+  );
+}
+
+export default AdditionalServices;

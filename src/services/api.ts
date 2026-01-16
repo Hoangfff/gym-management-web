@@ -15,6 +15,23 @@ import type {
   ApiServicePackage,
   ReqCreatePackageDTO,
   ReqUpdatePackageDTO,
+  ApiBodyMetric,
+  ReqCreateBodyMetricDTO,
+  ReqUpdateBodyMetricDTO,
+  ResultPaginationDTO,
+  ApiAdditionalService,
+  ReqCreateAdditionalServiceDTO,
+  ReqUpdateAdditionalServiceDTO,
+  ApiFood,
+  ReqCreateFoodDTO,
+  ReqUpdateFoodDTO,
+  FoodTypeEnum,
+  ApiDailyDiet,
+  ReqCreateDailyDietDTO,
+  ReqUpdateDailyDietDTO,
+  ApiDietDetail,
+  ReqCreateDietDetailDTO,
+  ReqUpdateDietDetailDTO,
 } from '../types/api.ts';
 
 // ===== Axios Instance Configuration =====
@@ -264,9 +281,241 @@ export const packageApi = {
   },
 };
 
+// ===== Body Metrics API =====
+
+export const bodyMetricsApi = {
+  // Get all body metrics
+  getAll: async (): Promise<ApiResponse<ApiBodyMetric[]>> => {
+    const response = await apiClient.get<ApiResponse<ApiBodyMetric[]>>('/api/v1/body-metrics');
+    return response.data;
+  },
+
+  // Get by member ID
+  getByMemberId: async (memberId: number): Promise<ApiResponse<ApiBodyMetric[]>> => {
+    const response = await apiClient.get<ApiResponse<ApiBodyMetric[]>>(`/api/v1/body-metrics/member/${memberId}`);
+    return response.data;
+  },
+
+  // Get by ID
+  getById: async (id: number): Promise<ApiResponse<ApiBodyMetric>> => {
+    const response = await apiClient.get<ApiResponse<ApiBodyMetric>>(`/api/v1/body-metrics/${id}`);
+    return response.data;
+  },
+
+  // Create body metric
+  create: async (data: ReqCreateBodyMetricDTO): Promise<ApiResponse<ApiBodyMetric>> => {
+    const response = await apiClient.post<ApiResponse<ApiBodyMetric>>('/api/v1/body-metrics', data);
+    return response.data;
+  },
+
+  // Update body metric
+  update: async (id: number, data: ReqUpdateBodyMetricDTO): Promise<ApiResponse<ApiBodyMetric>> => {
+    const response = await apiClient.put<ApiResponse<ApiBodyMetric>>(`/api/v1/body-metrics/${id}`, data);
+    return response.data;
+  },
+
+  // Delete body metric
+  delete: async (id: number): Promise<ApiResponse<null>> => {
+    const response = await apiClient.delete<ApiResponse<null>>(`/api/v1/body-metrics/${id}`);
+    return response.data;
+  },
+
+  // Fetch with pagination & filter
+  fetch: async (params: {
+    memberId?: number;
+    fromDate?: string;
+    toDate?: string;
+    page?: number;
+    size?: number;
+  }): Promise<ApiResponse<ResultPaginationDTO<ApiBodyMetric>>> => {
+    const response = await apiClient.get<ApiResponse<ResultPaginationDTO<ApiBodyMetric>>>(
+      '/api/v1/body-metrics/fetch',
+      { params }
+    );
+    return response.data;
+  },
+};
+
+// ===== Additional Service API =====
+
+export const additionalServiceApi = {
+  // Get all additional services
+  getAll: async (): Promise<ApiResponse<ApiAdditionalService[]>> => {
+    const response = await apiClient.get<ApiResponse<ApiAdditionalService[]>>('/api/v1/additional-services');
+    return response.data;
+  },
+
+  // Get all active additional services
+  getAllActive: async (): Promise<ApiResponse<ApiAdditionalService[]>> => {
+    const response = await apiClient.get<ApiResponse<ApiAdditionalService[]>>('/api/v1/additional-services/active');
+    return response.data;
+  },
+
+  // Get by ID
+  getById: async (id: number): Promise<ApiResponse<ApiAdditionalService>> => {
+    const response = await apiClient.get<ApiResponse<ApiAdditionalService>>(`/api/v1/additional-services/${id}`);
+    return response.data;
+  },
+
+  // Create additional service
+  create: async (data: ReqCreateAdditionalServiceDTO): Promise<ApiResponse<ApiAdditionalService>> => {
+    const response = await apiClient.post<ApiResponse<ApiAdditionalService>>('/api/v1/additional-services', data);
+    return response.data;
+  },
+
+  // Update additional service
+  update: async (id: number, data: ReqUpdateAdditionalServiceDTO): Promise<ApiResponse<ApiAdditionalService>> => {
+    const response = await apiClient.put<ApiResponse<ApiAdditionalService>>(`/api/v1/additional-services/${id}`, data);
+    return response.data;
+  },
+
+  // Activate additional service
+  activate: async (id: number): Promise<ApiResponse<ApiAdditionalService>> => {
+    const response = await apiClient.put<ApiResponse<ApiAdditionalService>>(`/api/v1/additional-services/${id}/activate`);
+    return response.data;
+  },
+
+  // Deactivate additional service
+  deactivate: async (id: number): Promise<ApiResponse<ApiAdditionalService>> => {
+    const response = await apiClient.put<ApiResponse<ApiAdditionalService>>(`/api/v1/additional-services/${id}/deactivate`);
+    return response.data;
+  },
+
+  // Delete additional service
+  delete: async (id: number): Promise<ApiResponse<null>> => {
+    const response = await apiClient.delete<ApiResponse<null>>(`/api/v1/additional-services/${id}`);
+    return response.data;
+  },
+
+  // Fetch with filter & pagination
+  fetch: async (params: {
+    name?: string;
+    isActive?: boolean;
+    page?: number;
+    size?: number;
+  }): Promise<ApiResponse<ResultPaginationDTO<ApiAdditionalService>>> => {
+    const response = await apiClient.get<ApiResponse<ResultPaginationDTO<ApiAdditionalService>>>(
+      '/api/v1/additional-services/fetch',
+      { params }
+    );
+    return response.data;
+  },
+};
+
+// ===== Food API =====
+
+export const foodApi = {
+  // Get all foods
+  getAll: async (): Promise<ApiResponse<ApiFood[]>> => {
+    const response = await apiClient.get<ApiResponse<ApiFood[]>>('/api/v1/foods');
+    return response.data;
+  },
+
+  // Get food by ID
+  getById: async (id: number): Promise<ApiResponse<ApiFood>> => {
+    const response = await apiClient.get<ApiResponse<ApiFood>>(`/api/v1/foods/${id}`);
+    return response.data;
+  },
+
+  // Get foods by type with pagination
+  getByType: async (type: FoodTypeEnum, page: number = 1, size: number = 20): Promise<ApiResponse<ResultPaginationDTO<ApiFood>>> => {
+    const response = await apiClient.get<ApiResponse<ResultPaginationDTO<ApiFood>>>(`/api/v1/foods/by-type/${type}`, {
+      params: { page, size }
+    });
+    return response.data;
+  },
+
+  // Search foods by keyword with pagination
+  search: async (keyword: string, page: number = 1, size: number = 20): Promise<ApiResponse<ResultPaginationDTO<ApiFood>>> => {
+    const response = await apiClient.get<ApiResponse<ResultPaginationDTO<ApiFood>>>('/api/v1/foods/search', {
+      params: { keyword, page, size }
+    });
+    return response.data;
+  },
+
+  // Create food
+  create: async (data: ReqCreateFoodDTO): Promise<ApiResponse<ApiFood>> => {
+    const response = await apiClient.post<ApiResponse<ApiFood>>('/api/v1/foods', data);
+    return response.data;
+  },
+
+  // Update food
+  update: async (id: number, data: ReqUpdateFoodDTO): Promise<ApiResponse<ApiFood>> => {
+    const response = await apiClient.put<ApiResponse<ApiFood>>(`/api/v1/foods/${id}`, data);
+    return response.data;
+  },
+
+  // Delete food
+  delete: async (id: number): Promise<ApiResponse<null>> => {
+    const response = await apiClient.delete<ApiResponse<null>>(`/api/v1/foods/${id}`);
+    return response.data;
+  },
+};
+
+// ===== Daily Diet API =====
+
+export const dailyDietApi = {
+  // Get diet by ID
+  getById: async (id: number): Promise<ApiResponse<ApiDailyDiet>> => {
+    const response = await apiClient.get<ApiResponse<ApiDailyDiet>>(`/api/v1/daily-diets/${id}`);
+    return response.data;
+  },
+
+  // Create daily diet
+  create: async (data: ReqCreateDailyDietDTO): Promise<ApiResponse<ApiDailyDiet>> => {
+    const response = await apiClient.post<ApiResponse<ApiDailyDiet>>('/api/v1/daily-diets', data);
+    return response.data;
+  },
+
+  // Update daily diet
+  update: async (id: number, data: ReqUpdateDailyDietDTO): Promise<ApiResponse<ApiDailyDiet>> => {
+    const response = await apiClient.put<ApiResponse<ApiDailyDiet>>(`/api/v1/daily-diets/${id}`, data);
+    return response.data;
+  },
+
+  // Delete daily diet
+  delete: async (id: number): Promise<ApiResponse<null>> => {
+    const response = await apiClient.delete<ApiResponse<null>>(`/api/v1/daily-diets/${id}`);
+    return response.data;
+  },
+};
+
+// ===== Diet Detail API =====
+
+export const dietDetailApi = {
+  // Get all foods in a daily diet
+  getByDietId: async (dietId: number): Promise<ApiResponse<ApiDietDetail[]>> => {
+    const response = await apiClient.get<ApiResponse<ApiDietDetail[]>>(`/api/v1/diet-details/by-diet/${dietId}`);
+    return response.data;
+  },
+
+  // Add food to daily diet
+  addFood: async (data: ReqCreateDietDetailDTO): Promise<ApiResponse<ApiDietDetail>> => {
+    const response = await apiClient.post<ApiResponse<ApiDietDetail>>('/api/v1/diet-details', data);
+    return response.data;
+  },
+
+  // Update diet detail
+  updateFood: async (dietId: number, foodId: number, data: ReqUpdateDietDetailDTO): Promise<ApiResponse<ApiDietDetail>> => {
+    const response = await apiClient.put<ApiResponse<ApiDietDetail>>(`/api/v1/diet-details/diet/${dietId}/food/${foodId}`, data);
+    return response.data;
+  },
+
+  // Remove food from daily diet
+  removeFood: async (dietId: number, foodId: number): Promise<ApiResponse<null>> => {
+    const response = await apiClient.delete<ApiResponse<null>>(`/api/v1/diet-details/diet/${dietId}/food/${foodId}`);
+    return response.data;
+  },
+};
+
 export default {
   memberApi,
   ptApi,
   slotApi,
   packageApi,
+  bodyMetricsApi,
+  additionalServiceApi,
+  foodApi,
+  dailyDietApi,
+  dietDetailApi,
 };

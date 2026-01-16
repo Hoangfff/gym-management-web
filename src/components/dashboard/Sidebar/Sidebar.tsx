@@ -14,7 +14,8 @@ import {
   BoxIcon,
   BarChart3,
   LogOut,
-  Home
+  Home,
+  Activity
 } from 'lucide-react';
 import './Sidebar.css';
 
@@ -45,6 +46,7 @@ const adminMenuItems: SidebarItem[] = [
   { id: 'workouts', label: 'Workouts', icon: Dumbbell },
   { id: 'diets', label: 'Diets', icon: Apple },
   { id: 'additional-services', label: 'Additional Services', icon: Sparkles },
+  { id: 'body-metrics', label: 'Body Metrics', icon: Activity },
   { id: 'payments', label: 'Payments', icon: CreditCard },
   { id: 'inventory', label: 'Inventory', icon: BoxIcon },
   { id: 'report', label: 'Report', icon: BarChart3 },
@@ -59,6 +61,7 @@ const ptMenuItems: SidebarItem[] = [
   { id: 'members', label: 'Members', icon: Users },
   { id: 'workouts', label: 'Workouts', icon: Dumbbell },
   { id: 'diets', label: 'Diets', icon: Apple },
+  { id: 'body-metrics', label: 'Body Metrics', icon: Activity },
   { id: 'report', label: 'Report', icon: BarChart3 },
 ];
 

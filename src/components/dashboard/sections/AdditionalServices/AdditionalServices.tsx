@@ -1,659 +1,745 @@
-import { useState } from 'react';
-import { Pencil, Trash2, Search, Upload, X, DollarSign, Check } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Pencil, Trash2, RefreshCw, Power, PowerOff, Eye, Search, Package, DollarSign, TrendingUp } from 'lucide-react';
 import Modal from '../../Modal/index.ts';
-import type { AdditionalService, ServiceCategory, Member } from '../../../../types/index.ts';
+import { ConfirmModal, useToast } from '../../../ui/index.ts';
+import { additionalServiceApi } from '../../../../services/index.ts';
+import type { ApiAdditionalService, ReqCreateAdditionalServiceDTO, ReqUpdateAdditionalServiceDTO } from '../../../../types/api.ts';
 import './AdditionalServices.css';
 
 interface AdditionalServicesProps {
-  onNavigateToPayments?: () => void;
+  userRole?: 'admin' | 'pt';
 }
 
-// Mock data
-const mockServices: AdditionalService[] = [
-  {
-    id: 'AS-0001',
-    name: 'Standard water bottle',
-    description: '500ml water bottle.',
-    category: 'other',
-    costPrice: 1,
-    sellPrice: 3,
-    maxCapacity: 100,
-    isActive: true,
-    image: '/images/placeholder.jpg'
-  },
-  {
-    id: 'AS-0002',
-    name: 'Protein bar',
-    description: '75g bar containing 20g protein.',
-    category: 'wellness',
-    costPrice: 3,
-    sellPrice: 5,
-    maxCapacity: 50,
-    isActive: true,
-    image: '/images/placeholder.jpg'
-  }
-];
+// Helper functions
+const formatCurrency = (value: number): string => {
+  return new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency: 'VND'
+  }).format(value);
+};
 
-const mockMembers: Member[] = [
-  { id: 'SFM2301N1', name: 'Johnny Sins', email: '', phone: '', dateOfBirth: '', gender: 'male', cccd: '', avatar: '/images/user-icon-placeholder.png', dateJoined: '11/01/2026', status: 'active' },
-  { id: 'SFM2301N2', name: 'Juan Dela Cruz', email: '', phone: '', dateOfBirth: '', gender: 'male', cccd: '', dateJoined: '11/01/2026', status: 'active' },
-  { id: 'SFM2301N3', name: 'Jen Velasquez', email: '', phone: '', dateOfBirth: '', gender: 'female', cccd: '', dateJoined: '20/01/2026', status: 'no-contract' },
-  { id: 'SFM2301N4', name: 'Tom Hall', email: '', phone: '', dateOfBirth: '', gender: 'male', cccd: '', dateJoined: '15/01/2025', status: 'expired' }
-];
+const formatDate = (dateString: string): string => {
+  return new Date(dateString).toLocaleDateString('vi-VN');
+};
 
-const CATEGORIES: { value: ServiceCategory | 'all'; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'wellness', label: 'Wellness' },
-  { value: 'recovery', label: 'Recovery' },
-  { value: 'assessment', label: 'Assessment' },
-  { value: 'other', label: 'Other' }
-];
+const calculateProfit = (costPrice: number, sellPrice: number): number => {
+  return sellPrice - costPrice;
+};
 
-function AdditionalServices({ onNavigateToPayments }: AdditionalServicesProps) {
-  const [activeCategory, setActiveCategory] = useState<ServiceCategory | 'all'>('all');
-  
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showOrderModal, setShowOrderModal] = useState(false);
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-  
-  const [selectedService, setSelectedService] = useState<AdditionalService | null>(null);
-  const [orderPaymentId, setOrderPaymentId] = useState('');
-  
+const calculateProfitMargin = (costPrice: number, sellPrice: number): number => {
+  if (sellPrice === 0) return 0;
+  return ((sellPrice - costPrice) / sellPrice) * 100;
+};
+
+function AdditionalServices({ userRole }: AdditionalServicesProps) {
+  void userRole; // Reserved for role-based features
+  const { showToast } = useToast();
+
+  // Data state
+  const [services, setServices] = useState<ApiAdditionalService[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Filter state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+
+  // Modal state
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [selectedService, setSelectedService] = useState<ApiAdditionalService | null>(null);
+
   // Form state
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    category: '' as ServiceCategory | '',
-    costPrice: 0,
-    sellPrice: 0,
-    maxCapacity: 1,
-    isActive: true,
-    image: ''
+    costPrice: '',
+    suggestSellPrice: ''
   });
-  
-  // Order state
-  const [orderData, setOrderData] = useState({
-    quantity: 1,
-    memberId: '',
-    memberName: ''
-  });
-  
-  const [memberSearchTerm, setMemberSearchTerm] = useState('');
-  const [memberPage, setMemberPage] = useState(1);
 
-  const stats = {
-    totalServices: mockServices.length,
-    activeServices: mockServices.filter(s => s.isActive).length,
-    totalBookings: 415,
-    avgMargin: '42%',
-    revenue: '$16500'
-  };
+  // Fetch data on mount
+  useEffect(() => {
+    fetchServices();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const filteredServices = activeCategory === 'all' 
-    ? mockServices 
-    : mockServices.filter(s => s.category === activeCategory);
-
-  const filteredMembers = mockMembers.filter(m =>
-    m.name.toLowerCase().includes(memberSearchTerm.toLowerCase()) ||
-    m.id.toLowerCase().includes(memberSearchTerm.toLowerCase())
-  );
-  const paginatedMembers = filteredMembers.slice((memberPage - 1) * 4, memberPage * 4);
-  const totalMemberPages = Math.ceil(filteredMembers.length / 4);
-
-  const calculateMargin = (cost: number, sell: number) => {
-    if (cost === 0) return { percentage: 0, profit: 0 };
-    const profit = sell - cost;
-    const percentage = Math.round((profit / cost) * 100);
-    return { percentage, profit };
-  };
-
-  const handleAdd = () => {
-    console.log('Adding service:', formData);
-    setShowAddModal(false);
-    resetForm();
-  };
-
-  const handleUpdate = () => {
-    console.log('Updating service:', formData);
-    setShowEditModal(false);
-    resetForm();
-  };
-
-  const handleEdit = (service: AdditionalService) => {
-    setSelectedService(service);
-    setFormData({
-      name: service.name,
-      description: service.description,
-      category: service.category,
-      costPrice: service.costPrice,
-      sellPrice: service.sellPrice,
-      maxCapacity: service.maxCapacity,
-      isActive: service.isActive,
-      image: service.image || ''
-    });
-    setShowEditModal(true);
-  };
-
-  const handleDelete = (service: AdditionalService) => {
-    if (confirm(`Delete "${service.name}"?`)) {
-      console.log('Deleting service:', service.id);
+  const fetchServices = async () => {
+    setIsLoading(true);
+    try {
+      const response = await additionalServiceApi.getAll();
+      setServices(response.data);
+    } catch (error) {
+      console.error('Failed to fetch services:', error);
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: 'Không thể tải danh sách dịch vụ'
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleOrder = (service: AdditionalService) => {
+  // Stats
+  const totalServices = services.length;
+  const activeServices = services.filter(s => s.isActive).length;
+  const avgProfit = services.length > 0 
+    ? services.reduce((sum, s) => sum + calculateProfit(s.costPrice, s.suggestSellPrice), 0) / services.length 
+    : 0;
+  const totalPotentialRevenue = services.filter(s => s.isActive).reduce((sum, s) => sum + s.suggestSellPrice, 0);
+
+  // Filtered services
+  const filteredServices = services.filter(service => {
+    const matchesSearch = !searchQuery || 
+      service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      service.description?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = filterStatus === 'all' || 
+      (filterStatus === 'active' && service.isActive) ||
+      (filterStatus === 'inactive' && !service.isActive);
+    return matchesSearch && matchesStatus;
+  });
+
+  const handleAddService = async () => {
+    if (!formData.name || !formData.costPrice || !formData.suggestSellPrice) {
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: 'Vui lòng điền đầy đủ thông tin bắt buộc'
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const requestData: ReqCreateAdditionalServiceDTO = {
+        name: formData.name,
+        description: formData.description || undefined,
+        costPrice: parseFloat(formData.costPrice),
+        suggestSellPrice: parseFloat(formData.suggestSellPrice)
+      };
+
+      await additionalServiceApi.create(requestData);
+
+      showToast({
+        type: 'success',
+        title: 'Thành công',
+        message: 'Đã thêm dịch vụ mới'
+      });
+
+      setIsAddModalOpen(false);
+      resetForm();
+      fetchServices();
+    } catch (error: unknown) {
+      console.error('Failed to create service:', error);
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: axiosError.response?.data?.message || 'Không thể thêm dịch vụ'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUpdateService = async () => {
+    if (!selectedService) return;
+
+    setIsSubmitting(true);
+    try {
+      const requestData: ReqUpdateAdditionalServiceDTO = {
+        name: formData.name || undefined,
+        description: formData.description || undefined,
+        costPrice: formData.costPrice ? parseFloat(formData.costPrice) : undefined,
+        suggestSellPrice: formData.suggestSellPrice ? parseFloat(formData.suggestSellPrice) : undefined
+      };
+
+      await additionalServiceApi.update(selectedService.id, requestData);
+
+      showToast({
+        type: 'success',
+        title: 'Thành công',
+        message: 'Đã cập nhật dịch vụ'
+      });
+
+      setIsEditModalOpen(false);
+      setSelectedService(null);
+      resetForm();
+      fetchServices();
+    } catch (error: unknown) {
+      console.error('Failed to update service:', error);
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: axiosError.response?.data?.message || 'Không thể cập nhật dịch vụ'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteService = async () => {
+    if (!selectedService) return;
+
+    setIsSubmitting(true);
+    try {
+      await additionalServiceApi.delete(selectedService.id);
+
+      showToast({
+        type: 'success',
+        title: 'Thành công',
+        message: `Đã xóa dịch vụ ${selectedService.name}`
+      });
+
+      setIsDeleteModalOpen(false);
+      setSelectedService(null);
+      fetchServices();
+    } catch (error: unknown) {
+      console.error('Failed to delete service:', error);
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: axiosError.response?.data?.message || 'Không thể xóa dịch vụ'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleActivateService = async (service: ApiAdditionalService) => {
+    try {
+      await additionalServiceApi.activate(service.id);
+      showToast({
+        type: 'success',
+        title: 'Thành công',
+        message: `Đã kích hoạt dịch vụ ${service.name}`
+      });
+      fetchServices();
+    } catch (error: unknown) {
+      console.error('Failed to activate service:', error);
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: axiosError.response?.data?.message || 'Không thể kích hoạt dịch vụ'
+      });
+    }
+  };
+
+  const handleDeactivateService = async (service: ApiAdditionalService) => {
+    try {
+      await additionalServiceApi.deactivate(service.id);
+      showToast({
+        type: 'success',
+        title: 'Thành công',
+        message: `Đã vô hiệu hóa dịch vụ ${service.name}`
+      });
+      fetchServices();
+    } catch (error: unknown) {
+      console.error('Failed to deactivate service:', error);
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: axiosError.response?.data?.message || 'Không thể vô hiệu hóa dịch vụ'
+      });
+    }
+  };
+
+  const handleViewService = (service: ApiAdditionalService) => {
     setSelectedService(service);
-    setOrderData({ quantity: 1, memberId: '', memberName: '' });
-    setMemberSearchTerm('');
-    setMemberPage(1);
-    setShowOrderModal(true);
+    setIsViewModalOpen(true);
   };
 
-  const selectMember = (member: Member) => {
-    setOrderData({ ...orderData, memberId: member.id, memberName: member.name });
+  const openEditModal = (service: ApiAdditionalService) => {
+    setSelectedService(service);
+    setFormData({
+      name: service.name,
+      description: service.description || '',
+      costPrice: service.costPrice.toString(),
+      suggestSellPrice: service.suggestSellPrice.toString()
+    });
+    setIsEditModalOpen(true);
   };
 
-  const submitOrder = () => {
-    const paymentId = `000${Math.floor(Math.random() * 10)}`;
-    setOrderPaymentId(paymentId);
-    setShowOrderModal(false);
-    setShowConfirmModal(true);
+  const openDeleteModal = (service: ApiAdditionalService) => {
+    setSelectedService(service);
+    setIsDeleteModalOpen(true);
   };
 
   const resetForm = () => {
     setFormData({
       name: '',
       description: '',
-      category: '',
-      costPrice: 0,
-      sellPrice: 0,
-      maxCapacity: 1,
-      isActive: true,
-      image: ''
+      costPrice: '',
+      suggestSellPrice: ''
     });
-    setSelectedService(null);
   };
 
-  const getStatusBadge = (status: string) => {
-    const config: Record<string, { className: string }> = {
-      'active': { className: 'services__status--active' },
-      'no-contract': { className: 'services__status--warning' },
-      'expired': { className: 'services__status--expired' }
-    };
-    return config[status] || { className: '' };
-  };
-
-  const renderFooter = (onCancel: () => void, onSubmit: () => void, submitLabel: string) => (
-    <>
-      <button className="modal-form__btn modal-form__btn--secondary" onClick={onCancel}>
-        Cancel
-      </button>
-      <button className="modal-form__btn modal-form__btn--primary" onClick={onSubmit}>
-        {submitLabel}
-      </button>
-    </>
-  );
-
-  const margin = calculateMargin(formData.costPrice, formData.sellPrice);
+  // Calculate preview profit
+  const previewProfit = formData.costPrice && formData.suggestSellPrice
+    ? calculateProfit(parseFloat(formData.costPrice), parseFloat(formData.suggestSellPrice))
+    : 0;
+  const previewMargin = formData.costPrice && formData.suggestSellPrice
+    ? calculateProfitMargin(parseFloat(formData.costPrice), parseFloat(formData.suggestSellPrice))
+    : 0;
 
   return (
-    <div className="services">
-      <div className="services__header">
+    <div className="additional-services">
+      <div className="additional-services__header">
         <div>
-          <h1 className="services__title">Additional Services</h1>
-          <p className="services__subtitle">Manage extra services and amenities</p>
+          <h1 className="additional-services__title">Additional Services</h1>
+          <p className="additional-services__subtitle">Manage extra services and products for members</p>
         </div>
-        <button className="services__add-btn" onClick={() => setShowAddModal(true)}>
-          + Add New Service
-        </button>
+        <div className="additional-services__header-actions">
+          <button
+            className="additional-services__refresh-btn"
+            onClick={fetchServices}
+            disabled={isLoading}
+            title="Refresh"
+          >
+            <RefreshCw size={18} className={isLoading ? 'spinning' : ''} />
+          </button>
+          <button className="additional-services__create-btn" onClick={() => setIsAddModalOpen(true)}>
+            <Plus size={20} />
+            Add Service
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
-      <div className="services__stats">
-        <div className="services__stat">
-          <span className="services__stat-label">Total Services</span>
-          <span className="services__stat-value">{stats.totalServices}</span>
+      <div className="additional-services__stats">
+        <div className="stat-card">
+          <div className="stat-card__icon stat-card__icon--blue">
+            <Package size={24} />
+          </div>
+          <div className="stat-card__content">
+            <span className="stat-card__label">Total Services</span>
+            <span className="stat-card__value">{totalServices}</span>
+          </div>
         </div>
-        <div className="services__stat">
-          <span className="services__stat-label">Active Services</span>
-          <span className="services__stat-value">{stats.activeServices}</span>
+        <div className="stat-card">
+          <div className="stat-card__icon stat-card__icon--green">
+            <Power size={24} />
+          </div>
+          <div className="stat-card__content">
+            <span className="stat-card__label">Active Services</span>
+            <span className="stat-card__value">{activeServices}</span>
+          </div>
         </div>
-        <div className="services__stat">
-          <span className="services__stat-label">Total Bookings</span>
-          <span className="services__stat-value">{stats.totalBookings}</span>
+        <div className="stat-card">
+          <div className="stat-card__icon stat-card__icon--purple">
+            <TrendingUp size={24} />
+          </div>
+          <div className="stat-card__content">
+            <span className="stat-card__label">Avg. Profit/Service</span>
+            <span className="stat-card__value">{formatCurrency(avgProfit)}</span>
+          </div>
         </div>
-        <div className="services__stat">
-          <span className="services__stat-label">Avg. margin</span>
-          <span className="services__stat-value">{stats.avgMargin}</span>
-        </div>
-        <div className="services__stat">
-          <span className="services__stat-label">Revenue</span>
-          <span className="services__stat-value">{stats.revenue}</span>
+        <div className="stat-card">
+          <div className="stat-card__icon stat-card__icon--yellow">
+            <DollarSign size={24} />
+          </div>
+          <div className="stat-card__content">
+            <span className="stat-card__label">Total Active Value</span>
+            <span className="stat-card__value">{formatCurrency(totalPotentialRevenue)}</span>
+          </div>
         </div>
       </div>
 
-      {/* Category Tabs */}
-      <div className="services__categories">
-        {CATEGORIES.map((cat) => (
-          <button
-            key={cat.value}
-            className={`services__category ${activeCategory === cat.value ? 'services__category--active' : ''}`}
-            onClick={() => setActiveCategory(cat.value)}
-          >
-            {cat.label}
-          </button>
-        ))}
+      {/* Filters */}
+      <div className="additional-services__filters">
+        <div className="additional-services__search">
+          <Search size={18} />
+          <input
+            type="text"
+            placeholder="Search services..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+        <select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+          className="additional-services__filter-select"
+        >
+          <option value="all">All Status</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
       </div>
 
-      {/* Services Grid */}
-      <div className="services__grid">
-        {filteredServices.map((service) => {
-          const serviceMargin = calculateMargin(service.costPrice, service.sellPrice);
-          return (
-            <div key={service.id} className="services__card">
-              <div className="services__card-header">
-                <div className="services__card-image">
-                  <img src={service.image || '/images/placeholder.jpg'} alt={service.name} />
-                </div>
-                <div className="services__card-info">
-                  <h3 className="services__card-name">{service.name}</h3>
-                  <p className="services__card-id">ID: {service.id}</p>
-                </div>
-                <div className="services__card-actions">
-                  <button onClick={() => handleEdit(service)}><Pencil size={16} /></button>
-                  <button className="services__card-action--delete" onClick={() => handleDelete(service)}>
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
-
-              <p className="services__card-desc">{service.description}</p>
-
-              <div className="services__card-pricing">
-                <div className="services__card-price">
-                  <span className="services__card-price-label">Cost price</span>
-                  <span className="services__card-price-value">${service.costPrice}</span>
-                </div>
-                <div className="services__card-price">
-                  <span className="services__card-price-label">Sell price</span>
-                  <span className="services__card-price-value">${service.sellPrice}</span>
-                </div>
-              </div>
-
-              <div className="services__card-footer">
-                <div className="services__card-margin">
-                  <DollarSign size={16} />
-                  <span>Profit margin</span>
-                  <span className="services__card-margin-value">
-                    {serviceMargin.percentage}% (${serviceMargin.profit})
-                  </span>
-                </div>
-                <button className="services__order-btn" onClick={() => handleOrder(service)}>
-                  Order
-                </button>
-              </div>
-            </div>
-          );
-        })}
+      {/* Table */}
+      <div className="additional-services__table-container">
+        {isLoading ? (
+          <div className="additional-services__loading">
+            <RefreshCw size={32} className="spinning" />
+            <p>Loading services...</p>
+          </div>
+        ) : (
+          <table className="additional-services__table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>SERVICE NAME</th>
+                <th>COST PRICE</th>
+                <th>SELL PRICE</th>
+                <th>PROFIT</th>
+                <th>MARGIN</th>
+                <th>STATUS</th>
+                <th>ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredServices.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="additional-services__empty">
+                    No services found
+                  </td>
+                </tr>
+              ) : (
+                filteredServices.map(service => {
+                  const profit = calculateProfit(service.costPrice, service.suggestSellPrice);
+                  const margin = calculateProfitMargin(service.costPrice, service.suggestSellPrice);
+                  return (
+                    <tr key={service.id} className={!service.isActive ? 'additional-services__row--inactive' : ''}>
+                      <td>#{service.id}</td>
+                      <td className="additional-services__name">
+                        <div className="additional-services__name-cell">
+                          <span className="additional-services__name-text">{service.name}</span>
+                          {service.description && (
+                            <span className="additional-services__description">{service.description}</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="additional-services__price additional-services__price--cost">
+                        {formatCurrency(service.costPrice)}
+                      </td>
+                      <td className="additional-services__price additional-services__price--sell">
+                        {formatCurrency(service.suggestSellPrice)}
+                      </td>
+                      <td className={`additional-services__profit ${profit >= 0 ? 'additional-services__profit--positive' : 'additional-services__profit--negative'}`}>
+                        {formatCurrency(profit)}
+                      </td>
+                      <td className={`additional-services__margin ${margin >= 20 ? 'additional-services__margin--good' : 'additional-services__margin--low'}`}>
+                        {margin.toFixed(1)}%
+                      </td>
+                      <td>
+                        <span className={`additional-services__status additional-services__status--${service.isActive ? 'active' : 'inactive'}`}>
+                          {service.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="additional-services__actions">
+                          <button
+                            className="additional-services__action-btn"
+                            onClick={() => handleViewService(service)}
+                            title="View Details"
+                          >
+                            <Eye size={16} />
+                          </button>
+                          <button
+                            className="additional-services__action-btn"
+                            onClick={() => openEditModal(service)}
+                            title="Edit"
+                          >
+                            <Pencil size={16} />
+                          </button>
+                          {service.isActive ? (
+                            <button
+                              className="additional-services__action-btn additional-services__action-btn--deactivate"
+                              onClick={() => handleDeactivateService(service)}
+                              title="Deactivate"
+                            >
+                              <PowerOff size={16} />
+                            </button>
+                          ) : (
+                            <button
+                              className="additional-services__action-btn additional-services__action-btn--activate"
+                              onClick={() => handleActivateService(service)}
+                              title="Activate"
+                            >
+                              <Power size={16} />
+                            </button>
+                          )}
+                          <button
+                            className="additional-services__action-btn additional-services__action-btn--delete"
+                            onClick={() => openDeleteModal(service)}
+                            title="Delete"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {/* Add Service Modal */}
-      <Modal
-        isOpen={showAddModal}
-        onClose={() => { setShowAddModal(false); resetForm(); }}
-        title="Add New Service"
-        size="md"
-        footer={renderFooter(
-          () => { setShowAddModal(false); resetForm(); },
-          handleAdd,
-          'Add Service'
-        )}
-      >
-        <div className="modal-form">
-          <div className="modal-form__group">
-            <label className="modal-form__label">Service Photo</label>
-            <div className="services__photo-upload">
-              <div className="services__photo-preview">
-                <img src="/images/placeholder.jpg" alt="Preview" />
-              </div>
-              <div className="services__photo-dropzone">
-                <Upload size={24} />
-                <span>Click to upload or drag and drop</span>
-                <span className="services__photo-hint">PNG, JPG, JPEG up to 5MB</span>
-              </div>
-            </div>
-            <span className="modal-form__hint">Recommended: Square image, minimum 300x300px for best quality</span>
-          </div>
-
-          <h3 className="services__form-section">Basic Information</h3>
-
+      <Modal isOpen={isAddModalOpen} onClose={() => { setIsAddModalOpen(false); resetForm(); }} title="Add New Service">
+        <form className="modal-form" onSubmit={(e) => { e.preventDefault(); handleAddService(); }}>
           <div className="modal-form__group">
             <label className="modal-form__label modal-form__label--required">Service Name</label>
             <input
               type="text"
               className="modal-form__input"
-              placeholder="e.g., Sports Massage"
+              placeholder="e.g., Protein Shake, Towel Rental"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              required
             />
           </div>
 
           <div className="modal-form__group">
-            <label className="modal-form__label modal-form__label--required">Description</label>
+            <label className="modal-form__label">Description</label>
             <textarea
               className="modal-form__textarea"
-              placeholder="Brief description of the service..."
+              placeholder="Service description..."
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              rows={3}
             />
           </div>
-
-          <h3 className="services__form-section">Pricing</h3>
 
           <div className="modal-form__row">
             <div className="modal-form__group">
-              <label className="modal-form__label modal-form__label--required">Cost Price ($)</label>
+              <label className="modal-form__label modal-form__label--required">Cost Price (VND)</label>
               <input
                 type="number"
                 className="modal-form__input"
-                value={formData.costPrice || ''}
-                onChange={(e) => setFormData({ ...formData, costPrice: Number(e.target.value) })}
+                placeholder="e.g., 20000"
+                value={formData.costPrice}
+                onChange={(e) => setFormData({ ...formData, costPrice: e.target.value })}
+                required
+                min="0"
               />
-              <span className="modal-form__hint">Your cost to provide this service</span>
             </div>
             <div className="modal-form__group">
-              <label className="modal-form__label modal-form__label--required">Selling Price ($)</label>
+              <label className="modal-form__label modal-form__label--required">Suggested Sell Price (VND)</label>
               <input
                 type="number"
                 className="modal-form__input"
-                value={formData.sellPrice || ''}
-                onChange={(e) => setFormData({ ...formData, sellPrice: Number(e.target.value) })}
+                placeholder="e.g., 35000"
+                value={formData.suggestSellPrice}
+                onChange={(e) => setFormData({ ...formData, suggestSellPrice: e.target.value })}
+                required
+                min="0"
               />
-              <span className="modal-form__hint">Price charged to members</span>
             </div>
           </div>
 
-          <h3 className="services__form-section">Settings</h3>
-
-          <div className="modal-form__group">
-            <label className="modal-form__label">Max Capacity</label>
-            <input
-              type="number"
-              className="modal-form__input"
-              value={formData.maxCapacity}
-              onChange={(e) => setFormData({ ...formData, maxCapacity: Number(e.target.value) })}
-            />
-            <span className="modal-form__hint">Maximum number of people per session</span>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Edit Service Modal */}
-      <Modal
-        isOpen={showEditModal}
-        onClose={() => { setShowEditModal(false); resetForm(); }}
-        title="Edit Service"
-        size="md"
-        footer={renderFooter(
-          () => { setShowEditModal(false); resetForm(); },
-          handleUpdate,
-          'Update Service'
-        )}
-      >
-        <div className="modal-form">
-          <div className="modal-form__group">
-            <label className="modal-form__label">Service Photo</label>
-            <div className="services__photo-upload">
-              <div className="services__photo-preview services__photo-preview--has-image">
-                <img src={selectedService?.image || '/images/placeholder.jpg'} alt="Preview" />
-                {selectedService?.image && (
-                  <button className="services__photo-remove"><X size={12} /></button>
-                )}
+          {/* Profit Preview */}
+          {formData.costPrice && formData.suggestSellPrice && (
+            <div className="additional-services__profit-preview">
+              <div className="additional-services__profit-preview-item">
+                <span className="additional-services__profit-preview-label">Profit:</span>
+                <span className={`additional-services__profit-preview-value ${previewProfit >= 0 ? 'positive' : 'negative'}`}>
+                  {formatCurrency(previewProfit)}
+                </span>
               </div>
-            </div>
-            <span className="modal-form__hint">Recommended: Square image, minimum 300x300px for best quality</span>
-          </div>
-
-          <h3 className="services__form-section">Basic Information</h3>
-
-          <div className="modal-form__group">
-            <label className="modal-form__label modal-form__label--required">Service Name</label>
-            <input
-              type="text"
-              className="modal-form__input"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            />
-          </div>
-
-          <div className="modal-form__group">
-            <label className="modal-form__label modal-form__label--required">Description</label>
-            <textarea
-              className="modal-form__textarea"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            />
-          </div>
-
-          <h3 className="services__form-section">Pricing</h3>
-
-          <div className="modal-form__row">
-            <div className="modal-form__group">
-              <label className="modal-form__label modal-form__label--required">Cost Price ($)</label>
-              <input
-                type="number"
-                className="modal-form__input"
-                value={formData.costPrice || ''}
-                onChange={(e) => setFormData({ ...formData, costPrice: Number(e.target.value) })}
-              />
-              <span className="modal-form__hint">Your cost to provide this service</span>
-            </div>
-            <div className="modal-form__group">
-              <label className="modal-form__label modal-form__label--required">Selling Price ($)</label>
-              <input
-                type="number"
-                className="modal-form__input"
-                value={formData.sellPrice || ''}
-                onChange={(e) => setFormData({ ...formData, sellPrice: Number(e.target.value) })}
-              />
-              <span className="modal-form__hint">Price charged to members</span>
-            </div>
-          </div>
-
-          {formData.costPrice > 0 && formData.sellPrice > 0 && (
-            <div className="services__margin-display">
-              <div className="services__margin-item">
-                <span className="services__margin-label">Profit Margin</span>
-                <span className="services__margin-value services__margin-value--green">{margin.percentage}%</span>
-              </div>
-              <div className="services__margin-item">
-                <span className="services__margin-label">Profit per Sale</span>
-                <span className="services__margin-value">${margin.profit.toFixed(2)}</span>
+              <div className="additional-services__profit-preview-item">
+                <span className="additional-services__profit-preview-label">Margin:</span>
+                <span className={`additional-services__profit-preview-value ${previewMargin >= 20 ? 'good' : 'low'}`}>
+                  {previewMargin.toFixed(1)}%
+                </span>
               </div>
             </div>
           )}
 
-          <h3 className="services__form-section">Settings</h3>
-
-          <div className="modal-form__group">
-            <label className="modal-form__label">Max Capacity</label>
-            <input
-              type="number"
-              className="modal-form__input"
-              value={formData.maxCapacity}
-              onChange={(e) => setFormData({ ...formData, maxCapacity: Number(e.target.value) })}
-            />
-            <span className="modal-form__hint">Maximum number of people per session</span>
+          <div className="modal-form__actions">
+            <button
+              type="button"
+              className="modal-form__btn modal-form__btn--secondary"
+              onClick={() => { setIsAddModalOpen(false); resetForm(); }}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="modal-form__btn modal-form__btn--primary"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Adding...' : 'Add Service'}
+            </button>
           </div>
-
-          <div className="modal-form__checkbox">
-            <input
-              type="checkbox"
-              id="isActive"
-              checked={formData.isActive}
-              onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-            />
-            <label htmlFor="isActive">Active (available for booking)</label>
-          </div>
-        </div>
+        </form>
       </Modal>
 
-      {/* Order Modal */}
-      <Modal
-        isOpen={showOrderModal}
-        onClose={() => setShowOrderModal(false)}
-        title="Order Service"
-        size="md"
-        footer={renderFooter(
-          () => setShowOrderModal(false),
-          submitOrder,
-          'Confirm'
-        )}
-      >
-        {selectedService && (
-          <div className="services__order-form">
-            <div className="services__order-service">
-              <div className="services__order-image">
-                <img src={selectedService.image || '/images/placeholder.jpg'} alt={selectedService.name} />
-              </div>
-              <div>
-                <h3 className="services__order-name">{selectedService.name}</h3>
-                <p className="services__order-desc">{selectedService.description}</p>
-              </div>
-            </div>
+      {/* Edit Service Modal */}
+      <Modal isOpen={isEditModalOpen} onClose={() => { setIsEditModalOpen(false); setSelectedService(null); resetForm(); }} title="Edit Service">
+        <form className="modal-form" onSubmit={(e) => { e.preventDefault(); handleUpdateService(); }}>
+          <div className="modal-form__group">
+            <label className="modal-form__label modal-form__label--required">Service Name</label>
+            <input
+              type="text"
+              className="modal-form__input"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              required
+            />
+          </div>
 
+          <div className="modal-form__group">
+            <label className="modal-form__label">Description</label>
+            <textarea
+              className="modal-form__textarea"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              rows={3}
+            />
+          </div>
+
+          <div className="modal-form__row">
             <div className="modal-form__group">
-              <label className="modal-form__label">Quantity</label>
+              <label className="modal-form__label modal-form__label--required">Cost Price (VND)</label>
               <input
                 type="number"
                 className="modal-form__input"
-                min={1}
-                value={orderData.quantity}
-                onChange={(e) => setOrderData({ ...orderData, quantity: Number(e.target.value) })}
+                value={formData.costPrice}
+                onChange={(e) => setFormData({ ...formData, costPrice: e.target.value })}
+                required
+                min="0"
               />
             </div>
+            <div className="modal-form__group">
+              <label className="modal-form__label modal-form__label--required">Suggested Sell Price (VND)</label>
+              <input
+                type="number"
+                className="modal-form__input"
+                value={formData.suggestSellPrice}
+                onChange={(e) => setFormData({ ...formData, suggestSellPrice: e.target.value })}
+                required
+                min="0"
+              />
+            </div>
+          </div>
 
-            <div className="services__order-pricing">
-              <h4>Price Information</h4>
-              <div className="services__order-pricing-row">
-                <div className="services__order-pricing-item">
-                  <span>Cost price</span>
-                  <strong>${selectedService.costPrice}</strong>
-                </div>
-                <div className="services__order-pricing-item">
-                  <span>Sell price</span>
-                  <strong>${selectedService.sellPrice}</strong>
-                </div>
+          {/* Profit Preview */}
+          {formData.costPrice && formData.suggestSellPrice && (
+            <div className="additional-services__profit-preview">
+              <div className="additional-services__profit-preview-item">
+                <span className="additional-services__profit-preview-label">Profit:</span>
+                <span className={`additional-services__profit-preview-value ${previewProfit >= 0 ? 'positive' : 'negative'}`}>
+                  {formatCurrency(previewProfit)}
+                </span>
               </div>
-              <div className="services__order-total">
-                <span>Total price</span>
-                <strong>${selectedService.sellPrice * orderData.quantity}</strong>
+              <div className="additional-services__profit-preview-item">
+                <span className="additional-services__profit-preview-label">Margin:</span>
+                <span className={`additional-services__profit-preview-value ${previewMargin >= 20 ? 'good' : 'low'}`}>
+                  {previewMargin.toFixed(1)}%
+                </span>
               </div>
             </div>
+          )}
 
-            <div className="services__order-member">
-              <h4>Person receiving this service</h4>
-              <div className="modal-form__group">
-                <label className="modal-form__label modal-form__label--required">Selected User</label>
-                <input
-                  type="text"
-                  className="modal-form__input"
-                  value={orderData.memberName}
-                  readOnly
-                  placeholder="Select a member below"
-                />
-              </div>
+          <div className="modal-form__actions">
+            <button
+              type="button"
+              className="modal-form__btn modal-form__btn--secondary"
+              onClick={() => { setIsEditModalOpen(false); setSelectedService(null); resetForm(); }}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="modal-form__btn modal-form__btn--primary"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Updating...' : 'Update Service'}
+            </button>
+          </div>
+        </form>
+      </Modal>
 
-              <div className="services__member-select">
-                <div className="services__member-search">
-                  <Search size={16} />
-                  <input
-                    type="text"
-                    placeholder="Search by member name or ID..."
-                    value={memberSearchTerm}
-                    onChange={(e) => setMemberSearchTerm(e.target.value)}
-                  />
-                </div>
-                <table className="services__member-table">
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>PFP</th>
-                      <th>Member ID</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paginatedMembers.map((member) => (
-                      <tr 
-                        key={member.id}
-                        className={orderData.memberId === member.id ? 'services__member-row--selected' : ''}
-                        onClick={() => selectMember(member)}
-                      >
-                        <td>{member.name}</td>
-                        <td>
-                          <img 
-                            src={member.avatar || '/images/user-icon-placeholder.png'} 
-                            alt={member.name}
-                            className="services__member-avatar"
-                          />
-                        </td>
-                        <td>{member.id}</td>
-                        <td>
-                          <span className={`services__status ${getStatusBadge(member.status).className}`}>
-                            {member.status === 'no-contract' ? 'No Contract' : member.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <div className="services__member-pagination">
-                  <button disabled={memberPage === 1} onClick={() => setMemberPage(p => p - 1)}>
-                    Previous
-                  </button>
-                  <button disabled={memberPage >= totalMemberPages} onClick={() => setMemberPage(p => p + 1)}>
-                    Next
-                  </button>
-                </div>
+      {/* View Service Modal */}
+      <Modal isOpen={isViewModalOpen} onClose={() => { setIsViewModalOpen(false); setSelectedService(null); }} title="Service Details">
+        {selectedService && (
+          <div className="additional-services__view-modal">
+            <div className="additional-services__view-grid">
+              <div className="additional-services__view-item">
+                <span className="additional-services__view-label">ID</span>
+                <span className="additional-services__view-value">#{selectedService.id}</span>
               </div>
+              <div className="additional-services__view-item">
+                <span className="additional-services__view-label">Service Name</span>
+                <span className="additional-services__view-value">{selectedService.name}</span>
+              </div>
+              <div className="additional-services__view-item additional-services__view-item--full">
+                <span className="additional-services__view-label">Description</span>
+                <span className="additional-services__view-value">{selectedService.description || '-'}</span>
+              </div>
+              <div className="additional-services__view-item">
+                <span className="additional-services__view-label">Cost Price</span>
+                <span className="additional-services__view-value additional-services__view-value--cost">
+                  {formatCurrency(selectedService.costPrice)}
+                </span>
+              </div>
+              <div className="additional-services__view-item">
+                <span className="additional-services__view-label">Suggested Sell Price</span>
+                <span className="additional-services__view-value additional-services__view-value--sell">
+                  {formatCurrency(selectedService.suggestSellPrice)}
+                </span>
+              </div>
+              <div className="additional-services__view-item">
+                <span className="additional-services__view-label">Profit</span>
+                <span className={`additional-services__view-value ${calculateProfit(selectedService.costPrice, selectedService.suggestSellPrice) >= 0 ? 'additional-services__view-value--positive' : 'additional-services__view-value--negative'}`}>
+                  {formatCurrency(calculateProfit(selectedService.costPrice, selectedService.suggestSellPrice))}
+                </span>
+              </div>
+              <div className="additional-services__view-item">
+                <span className="additional-services__view-label">Profit Margin</span>
+                <span className="additional-services__view-value">
+                  {calculateProfitMargin(selectedService.costPrice, selectedService.suggestSellPrice).toFixed(1)}%
+                </span>
+              </div>
+              <div className="additional-services__view-item">
+                <span className="additional-services__view-label">Status</span>
+                <span className={`additional-services__status additional-services__status--${selectedService.isActive ? 'active' : 'inactive'}`}>
+                  {selectedService.isActive ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+              <div className="additional-services__view-item">
+                <span className="additional-services__view-label">Created By</span>
+                <span className="additional-services__view-value">{selectedService.createdBy || '-'}</span>
+              </div>
+              <div className="additional-services__view-item">
+                <span className="additional-services__view-label">Created At</span>
+                <span className="additional-services__view-value">{formatDate(selectedService.createdAt)}</span>
+              </div>
+              {selectedService.updatedAt && (
+                <div className="additional-services__view-item">
+                  <span className="additional-services__view-label">Updated At</span>
+                  <span className="additional-services__view-value">{formatDate(selectedService.updatedAt)}</span>
+                </div>
+              )}
             </div>
           </div>
         )}
       </Modal>
 
-      {/* Confirmation Modal */}
-      <Modal
-        isOpen={showConfirmModal}
-        onClose={() => setShowConfirmModal(false)}
-        title="Confirmation"
-        size="sm"
-      >
-        <div className="services__confirm">
-          <div className="services__confirm-icon">
-            <Check size={32} />
-          </div>
-          <h3 className="services__confirm-title">Order successful!</h3>
-          <p className="services__confirm-id">Payment ID: {orderPaymentId}</p>
-          <div className="services__confirm-actions">
-            <button 
-              className="modal-form__btn modal-form__btn--primary"
-              onClick={() => {
-                setShowConfirmModal(false);
-                onNavigateToPayments?.();
-              }}
-            >
-              Go to Payments
-            </button>
-            <button 
-              className="modal-form__btn modal-form__btn--secondary"
-              onClick={() => setShowConfirmModal(false)}
-            >
-              OK
-            </button>
-          </div>
-        </div>
-      </Modal>
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => { setIsDeleteModalOpen(false); setSelectedService(null); }}
+        onConfirm={handleDeleteService}
+        title="Delete Service"
+        message={`Are you sure you want to delete "${selectedService?.name}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={isSubmitting}
+      />
     </div>
   );
 }
