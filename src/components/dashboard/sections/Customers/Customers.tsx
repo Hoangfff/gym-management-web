@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Search, ChevronDown, Pencil, Trash2, Eye, RefreshCw, Activity } from 'lucide-react';
+import { Search, ChevronDown, Pencil, Trash2, Eye, RefreshCw, Activity, FileText } from 'lucide-react';
 import Modal from '../../Modal/index.ts';
 import { ConfirmModal, useToast } from '../../../ui/index.ts';
-import { memberApi, bodyMetricsApi } from '../../../../services/index.ts';
-import type { ApiMember, GenderEnum, ReqCreateMemberDTO, ReqUpdateMemberDTO, ApiBodyMetric } from '../../../../types/api.ts';
+import { memberApi, bodyMetricsApi, contractApi } from '../../../../services/index.ts';
+import type { ApiMember, GenderEnum, ReqCreateMemberDTO, ReqUpdateMemberDTO, ApiBodyMetric, ApiContract, ContractStatusEnum } from '../../../../types/api.ts';
 import './Customers.css';
 
 interface CustomersProps {
@@ -52,10 +52,12 @@ function Customers({ userRole, currentUserId }: CustomersProps) {
   // Data state
   const [members, setMembers] = useState<ApiMember[]>([]);
   const [memberBodyMetrics, setMemberBodyMetrics] = useState<ApiBodyMetric[]>([]);
+  const [memberContracts, setMemberContracts] = useState<ApiContract[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMetrics, setIsLoadingMetrics] = useState(false);
+  const [isLoadingContracts, setIsLoadingContracts] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [viewModalTab, setViewModalTab] = useState<'details' | 'metrics'>('details');
+  const [viewModalTab, setViewModalTab] = useState<'details' | 'metrics' | 'contracts'>('details');
   
   // Filter/pagination state
   const [searchTerm, setSearchTerm] = useState('');
@@ -149,14 +151,16 @@ function Customers({ userRole, currentUserId }: CustomersProps) {
       setSelectedMember(response.data);
       setViewModalTab('details');
       setShowViewModal(true);
-      // Fetch body metrics
+      // Fetch body metrics and contracts
       fetchMemberBodyMetrics(member.id);
+      fetchMemberContracts(member.id);
     } catch (error) {
       console.error('Failed to fetch member details:', error);
       setSelectedMember(member);
       setViewModalTab('details');
       setShowViewModal(true);
       fetchMemberBodyMetrics(member.id);
+      fetchMemberContracts(member.id);
     }
   };
 
@@ -171,6 +175,35 @@ function Customers({ userRole, currentUserId }: CustomersProps) {
     } finally {
       setIsLoadingMetrics(false);
     }
+  };
+
+  const fetchMemberContracts = async (memberId: number) => {
+    setIsLoadingContracts(true);
+    try {
+      const response = await contractApi.getByMemberId(memberId);
+      setMemberContracts(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.error('Failed to fetch member contracts:', error);
+      setMemberContracts([]);
+    } finally {
+      setIsLoadingContracts(false);
+    }
+  };
+
+  const getContractStatusClass = (status: ContractStatusEnum) => {
+    switch (status) {
+      case 'ACTIVE': return 'customers__contract-status--active';
+      case 'EXPIRED': return 'customers__contract-status--expired';
+      case 'CANCELLED': return 'customers__contract-status--cancelled';
+      default: return '';
+    }
+  };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND'
+    }).format(value);
   };
 
   const handleEdit = (member: ApiMember) => {
@@ -743,6 +776,7 @@ function Customers({ userRole, currentUserId }: CustomersProps) {
           setShowViewModal(false); 
           setSelectedMember(null); 
           setMemberBodyMetrics([]);
+          setMemberContracts([]);
           setViewModalTab('details');
         }}
         title="Member Details"
@@ -782,6 +816,13 @@ function Customers({ userRole, currentUserId }: CustomersProps) {
               >
                 <Activity size={16} />
                 Body Metrics ({memberBodyMetrics.length})
+              </button>
+              <button
+                className={`customers__view-tab ${viewModalTab === 'contracts' ? 'customers__view-tab--active' : ''}`}
+                onClick={() => setViewModalTab('contracts')}
+              >
+                <FileText size={16} />
+                Contracts ({memberContracts.length})
               </button>
             </div>
 
@@ -895,6 +936,77 @@ function Customers({ userRole, currentUserId }: CustomersProps) {
                             </div>
                           )}
                         </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Contracts Tab */}
+            {viewModalTab === 'contracts' && (
+              <div className="customers__contracts-tab">
+                {isLoadingContracts ? (
+                  <div className="customers__contracts-loading">
+                    <RefreshCw size={24} className="spinning" />
+                    <p>Loading contracts...</p>
+                  </div>
+                ) : memberContracts.length === 0 ? (
+                  <div className="customers__contracts-empty">
+                    <FileText size={48} />
+                    <h4>No contracts found</h4>
+                    <p>This member has no contracts yet.</p>
+                  </div>
+                ) : (
+                  <div className="customers__contracts-list">
+                    {memberContracts.map((contract) => (
+                      <div key={contract.id} className="customers__contract-card">
+                        <div className="customers__contract-header">
+                          <span className="customers__contract-id">
+                            Contract #{contract.id}
+                          </span>
+                          <span className={`customers__contract-status ${getContractStatusClass(contract.status)}`}>
+                            {contract.status}
+                          </span>
+                        </div>
+                        <div className="customers__contract-details">
+                          <div className="customers__contract-item">
+                            <span className="customers__contract-label">Package</span>
+                            <span className="customers__contract-value">{contract.packageName}</span>
+                          </div>
+                          <div className="customers__contract-item">
+                            <span className="customers__contract-label">Price</span>
+                            <span className="customers__contract-value">{formatCurrency(contract.packagePrice)}</span>
+                          </div>
+                          <div className="customers__contract-item">
+                            <span className="customers__contract-label">Duration</span>
+                            <span className="customers__contract-value">
+                              {formatDateDisplay(contract.startDate)} - {formatDateDisplay(contract.endDate)}
+                            </span>
+                          </div>
+                          <div className="customers__contract-item">
+                            <span className="customers__contract-label">Sessions</span>
+                            <span className="customers__contract-value">
+                              {contract.remainingSessions}/{contract.totalSessions} remaining
+                            </span>
+                          </div>
+                          {contract.ptName && (
+                            <div className="customers__contract-item">
+                              <span className="customers__contract-label">Personal Trainer</span>
+                              <span className="customers__contract-value">{contract.ptName}</span>
+                            </div>
+                          )}
+                          <div className="customers__contract-item">
+                            <span className="customers__contract-label">Signed At</span>
+                            <span className="customers__contract-value">{formatDateDisplay(contract.signedAt)}</span>
+                          </div>
+                        </div>
+                        {contract.notes && (
+                          <div className="customers__contract-notes">
+                            <span className="customers__contract-label">Notes:</span>
+                            <p>{contract.notes}</p>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

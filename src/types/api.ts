@@ -4,6 +4,7 @@ export type GenderEnum = 'MALE' | 'FEMALE';
 export type PackageTypeEnum = 'PT_INCLUDED' | 'NO_PT';
 export type PTStatusEnum = 'AVAILABLE' | 'BUSY' | 'INACTIVE';
 export type UserStatusEnum = 'ACTIVE' | 'INACTIVE';
+export type RoleEnum = 'ADMIN' | 'MEMBER' | 'PT';
 
 // Const objects for enum values (to use as runtime values)
 export const PackageType = {
@@ -34,6 +35,39 @@ export interface ApiResponse<T> {
   error: string | null;
   message: string;
   data: T;
+}
+
+// ===== Auth Types =====
+
+export interface ReqLoginDTO {
+  username: string;
+  password: string;
+}
+
+export interface AuthUser {
+  id: number;
+  username: string;
+  role: RoleEnum;
+}
+
+export interface LoginResponse {
+  token: string;
+  expiresIn: number;
+  user: AuthUser;
+}
+
+export interface AccountInfo {
+  id: number;
+  username: string;
+  email: string;
+  fullName: string;
+  role: RoleEnum;
+  status: UserStatusEnum;
+}
+
+export interface RefreshTokenResponse {
+  token: string;
+  expiresIn: number;
 }
 
 // ===== User Types =====
@@ -405,4 +439,283 @@ export interface ReqUpdateDietDetailDTO {
   prepMethod?: string;
   amount?: number;
   note?: string;
+}
+
+// ===== Workout Types =====
+
+export type WorkoutDifficultyEnum = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+export type WorkoutTypeEnum = 'Strength' | 'Cardio' | 'HIIT' | 'Core' | 'Flexibility';
+
+export const WorkoutDifficulty = {
+  BEGINNER: 'BEGINNER' as WorkoutDifficultyEnum,
+  INTERMEDIATE: 'INTERMEDIATE' as WorkoutDifficultyEnum,
+  ADVANCED: 'ADVANCED' as WorkoutDifficultyEnum
+};
+
+export const WorkoutType = {
+  STRENGTH: 'Strength' as WorkoutTypeEnum,
+  CARDIO: 'Cardio' as WorkoutTypeEnum,
+  HIIT: 'HIIT' as WorkoutTypeEnum,
+  CORE: 'Core' as WorkoutTypeEnum,
+  FLEXIBILITY: 'Flexibility' as WorkoutTypeEnum
+};
+
+export interface ApiWorkout {
+  id: number;
+  name: string;
+  description: string;
+  duration: number; // minutes
+  difficulty: WorkoutDifficultyEnum;
+  type: WorkoutTypeEnum;
+  createdAt: string;
+  updatedAt: string | null;
+  createdBy: string;
+  updatedBy: string | null;
+}
+
+export interface ReqCreateWorkoutDTO {
+  name: string;
+  description: string;
+  duration: number;
+  difficulty: WorkoutDifficultyEnum;
+  type: WorkoutTypeEnum;
+}
+
+export interface ReqUpdateWorkoutDTO {
+  name?: string;
+  description?: string;
+  duration?: number;
+  difficulty?: WorkoutDifficultyEnum;
+  type?: WorkoutTypeEnum;
+}
+
+// ===== Workout Device Types =====
+
+// Device type is a string (e.g., 'Cardio', 'Strength', 'Free Weights', 'Functional')
+export type DeviceTypeString = string;
+
+export interface ApiWorkoutDevice {
+  id: number;
+  name: string;
+  type: DeviceTypeString;
+  price: number;
+  dateImported: string; // YYYY-MM-DD
+  dateMaintenance: string | null; // YYYY-MM-DD
+  imageUrl: string | null;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+export interface ReqCreateWorkoutDeviceDTO {
+  name: string;
+  type: string;
+  price: number;
+  dateImported: string;
+  dateMaintenance?: string;
+  imageUrl?: string;
+}
+
+export interface ReqUpdateWorkoutDeviceDTO {
+  name?: string;
+  type?: string;
+  price?: number;
+  dateMaintenance?: string;
+  imageUrl?: string;
+}
+
+// ===== Contract Types =====
+
+export type ContractStatusEnum = 'ACTIVE' | 'EXPIRED' | 'CANCELLED';
+
+export const ContractStatus = {
+  ACTIVE: 'ACTIVE' as ContractStatusEnum,
+  EXPIRED: 'EXPIRED' as ContractStatusEnum,
+  CANCELLED: 'CANCELLED' as ContractStatusEnum
+};
+
+// New flat contract structure from API
+export interface ApiContract {
+  id: number;
+  memberId: number;
+  memberName: string;
+  packageId: number;
+  packageName: string;
+  packagePrice: number;
+  ptId: number | null;
+  ptName: string | null;
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  totalSessions: number;
+  remainingSessions: number;
+  status: ContractStatusEnum;
+  notes: string | null;
+  signedAt: string; // ISO timestamp
+  createdAt: string; // ISO timestamp
+}
+
+export interface ReqCreateContractDTO {
+  memberId: number;
+  packageId: number;
+  ptId?: number;
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD (must be startDate + package duration)
+  paymentMethod: string; // 'cash', 'card', etc.
+  discountAmount?: number;
+  notes?: string;
+}
+
+// ===== Booking Types =====
+
+export type BookingStatusEnum = 'CONFIRMED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW';
+
+export const BookingStatus = {
+  CONFIRMED: 'CONFIRMED' as BookingStatusEnum,
+  CANCELLED: 'CANCELLED' as BookingStatusEnum,
+  COMPLETED: 'COMPLETED' as BookingStatusEnum,
+  NO_SHOW: 'NO_SHOW' as BookingStatusEnum
+};
+
+export interface ApiBooking {
+  id: number;
+  contractId: number;
+  memberId: number;
+  memberName: string;
+  ptId: number;
+  ptName: string;
+  slotId: number;
+  slotStartTime: string; // HH:mm:ss
+  slotEndTime: string; // HH:mm:ss
+  bookingDate: string; // YYYY-MM-DD
+  createdBy: string;
+}
+
+export interface ReqCreateBookingDTO {
+  memberId: number;
+  ptId: number;
+  slotId: number;
+  bookingDate: string; // YYYY-MM-DD
+}
+
+export interface ReqUpdateBookingPtDTO {
+  ptId: number;
+}
+
+// ===== Available Slot Types =====
+
+export type AvailableSlotStatusEnum = 'AVAILABLE' | 'BOOKED' | 'CANCELLED';
+
+export const AvailableSlotStatus = {
+  AVAILABLE: 'AVAILABLE' as AvailableSlotStatusEnum,
+  BOOKED: 'BOOKED' as AvailableSlotStatusEnum,
+  CANCELLED: 'CANCELLED' as AvailableSlotStatusEnum
+};
+
+export interface ApiAvailableSlot {
+  id: number;
+  ptId: number;
+  ptName: string;
+  ptPhone?: string;
+  slotId: number;
+  slotCode: string;
+  slotDescription: string;
+  availableDate: string; // YYYY-MM-DD
+  status: AvailableSlotStatusEnum;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+// PT Available Slot (from GET /api/v1/available-slots/{ptId}/available)
+export type DayOfWeekEnum = 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY' | 'SATURDAY' | 'SUNDAY';
+
+export interface PtAvailableSlotPt {
+  ptId: number;
+  ptName: string;
+}
+
+export interface PtAvailableSlotSlot {
+  slotId: number;
+  slotName: string;
+  startTime: string; // HH:mm:ss
+  endTime: string; // HH:mm:ss
+}
+
+export interface ApiPtAvailableSlot {
+  id: number;
+  pt: PtAvailableSlotPt;
+  slot: PtAvailableSlotSlot;
+  dayOfWeek: DayOfWeekEnum;
+  isAvailable: boolean;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+  updatedBy: string;
+}
+
+export interface ReqCreateAvailableSlotDTO {
+  ptId: number;
+  slotId: number;
+  availableDate: string; // YYYY-MM-DD
+  status?: AvailableSlotStatusEnum;
+}
+
+export interface ReqUpdateAvailableSlotDTO {
+  status: AvailableSlotStatusEnum;
+}
+
+// ===== Invoice Types =====
+
+export type InvoiceStatusEnum = 'DRAFT' | 'PENDING' | 'PARTIAL' | 'PAID' | 'OVERDUE' | 'CANCELLED';
+
+export const InvoiceStatus = {
+  DRAFT: 'DRAFT' as InvoiceStatusEnum,
+  PENDING: 'PENDING' as InvoiceStatusEnum,
+  PARTIAL: 'PARTIAL' as InvoiceStatusEnum,
+  PAID: 'PAID' as InvoiceStatusEnum,
+  OVERDUE: 'OVERDUE' as InvoiceStatusEnum,
+  CANCELLED: 'CANCELLED' as InvoiceStatusEnum
+};
+
+export interface InvoiceItem {
+  id: number;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  amount: number;
+}
+
+export interface PaymentHistoryItem {
+  date: string;
+  amount: number;
+  method: string;
+}
+
+export interface ApiInvoice {
+  id: number;
+  memberId: number;
+  memberName: string;
+  invoiceDate: string;
+  dueDate: string;
+  status: InvoiceStatusEnum;
+  subtotal: number;
+  tax: number;
+  total: number;
+  paid: number;
+  remaining: number;
+  items: InvoiceItem[];
+  notes?: string;
+  lastPaymentDate?: string;
+  paymentHistory?: PaymentHistoryItem[];
+}
+
+export interface ReqAddServiceToInvoiceDTO {
+  description: string;
+  quantity: number;
+  unitPrice: number;
+}
+
+export interface ReqUpdatePaymentStatusDTO {
+  amountPaid: number;
+  paymentMethod: string;
+  paymentDate: string;
+  notes?: string;
 }

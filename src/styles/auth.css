@@ -92,6 +92,16 @@
     color: var(--color-gray-600);
 }
 
+.auth-error {
+    padding: var(--spacing-md);
+    background-color: rgba(208, 0, 0, 0.1);
+    border: 1px solid #D00000;
+    border-radius: var(--radius-md);
+    color: #D00000;
+    font-size: var(--font-size-sm);
+    text-align: center;
+}
+
 .auth-form {
     display: flex;
     flex-direction: column;

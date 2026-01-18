@@ -185,3 +185,237 @@
     gap: var(--spacing-md);
   }
 }
+
+/* Header Actions */
+.pt-availability__header-actions {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: center;
+}
+
+.pt-availability__refresh-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  background: var(--color-white);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  color: var(--color-gray-500);
+}
+
+.pt-availability__refresh-btn:hover:not(:disabled) {
+  background: var(--color-primary);
+  color: var(--color-white);
+  border-color: var(--color-primary);
+}
+
+.pt-availability__refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Loading and Empty States */
+.pt-availability__loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-lg);
+  padding: 60px 20px;
+  background: var(--color-white);
+  border-radius: var(--radius-xl);
+  color: var(--color-gray-500);
+}
+
+.pt-availability__loading .spinning {
+  animation: spin 1s linear infinite;
+  color: var(--color-primary);
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.pt-availability__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-md);
+  padding: 60px 20px;
+  background: var(--color-white);
+  border-radius: var(--radius-xl);
+  text-align: center;
+}
+
+.pt-availability__empty svg {
+  color: var(--color-gray-300);
+}
+
+.pt-availability__empty h3 {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  color: var(--color-dashboard-text);
+}
+
+.pt-availability__empty p {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-500);
+}
+
+/* Filters */
+.pt-availability__filters {
+  display: flex;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.pt-availability__filter-select {
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: var(--font-size-sm);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-md);
+  background: var(--color-white);
+  cursor: pointer;
+  min-width: 200px;
+}
+
+.pt-availability__filter-select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+/* Date Groups */
+.pt-availability__date-group {
+  background: var(--color-white);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+}
+
+.pt-availability__date-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-md);
+  padding-bottom: var(--spacing-sm);
+  border-bottom: 1px solid var(--color-gray-200);
+}
+
+.pt-availability__date-title {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-primary);
+  margin: 0;
+}
+
+.pt-availability__slot-count {
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-500);
+}
+
+.pt-availability__slots-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+/* Slot Card */
+.pt-availability__slot-card {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  background: #f8f9fa;
+  border-radius: var(--radius-md);
+  min-width: 280px;
+}
+
+.pt-availability__slot-info {
+  flex: 1;
+}
+
+.pt-availability__slot-pt {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-dashboard-text);
+  margin: 0 0 var(--spacing-xs) 0;
+}
+
+.pt-availability__slot-details {
+  display: flex;
+  gap: var(--spacing-md);
+  font-size: var(--font-size-xs);
+  color: var(--color-gray-500);
+}
+
+.pt-availability__slot-detail {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.pt-availability__slot-status {
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+.pt-availability__slot-status--available {
+  background: #e6f7e6;
+  color: var(--color-dashboard-green);
+}
+
+.pt-availability__slot-status--booked {
+  background: #fff3e0;
+  color: #f57c00;
+}
+
+.pt-availability__slot-status--cancelled {
+  background: #ffebee;
+  color: #D00000;
+}
+
+.pt-availability__slot-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: none;
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  color: var(--color-gray-500);
+  transition: all var(--transition-fast);
+}
+
+.pt-availability__slot-delete:hover {
+  background: #ffebee;
+  border-color: #D00000;
+  color: #D00000;
+}
+
+/* Confirm Modal */
+.confirm-modal {
+  text-align: center;
+}
+
+.confirm-modal__message {
+  font-size: var(--font-size-base);
+  color: var(--color-dashboard-text);
+  margin: 0 0 var(--spacing-xl) 0;
+}
+
+.confirm-modal__actions {
+  display: flex;
+  gap: var(--spacing-md);
+  justify-content: center;
+}

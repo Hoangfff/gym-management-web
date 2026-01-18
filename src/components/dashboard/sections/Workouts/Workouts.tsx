@@ -1,7 +1,15 @@
-import { useState } from 'react';
-import { Search, ChevronDown, Pencil, Trash2, Clock, Flame, Dumbbell, Upload } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, ChevronDown, Pencil, Trash2, Clock, Dumbbell, RefreshCw, Eye } from 'lucide-react';
 import Modal from '../../Modal/index.ts';
-import type { Workout, WorkoutDifficulty, EquipmentType } from '../../../../types/index.ts';
+import { ConfirmModal, useToast } from '../../../ui/index.ts';
+import { workoutApi } from '../../../../services/index.ts';
+import type { 
+  ApiWorkout, 
+  ReqCreateWorkoutDTO, 
+  ReqUpdateWorkoutDTO,
+  WorkoutDifficultyEnum, 
+  WorkoutTypeEnum 
+} from '../../../../types/api.ts';
 import './Workouts.css';
 
 interface WorkoutsProps {
@@ -9,132 +17,273 @@ interface WorkoutsProps {
   currentUserId?: string;
 }
 
-// Mock data
-const mockWorkouts: Workout[] = [
-  {
-    id: 'wk-1',
-    name: 'Full Body Strength',
-    description: 'Complete strength training routine targeting all major muscle groups',
-    duration: 60,
-    difficulty: 'intermediate',
-    equipment: 'free-weights',
-    calories: 350,
-    images: ['/images/workout1.jpg', '/images/workout2.jpg'],
-    createdBy: 'Martell Chen',
-    createdById: 'pt-1'
-  },
-  {
-    id: 'wk-2',
-    name: 'HIIT Cardio Blast',
-    description: 'High-intensity interval training for maximum calorie burn',
-    duration: 30,
-    difficulty: 'advanced',
-    equipment: 'none',
-    calories: 400,
-    createdBy: 'Peter Johnson',
-    createdById: 'pt-2'
-  },
-  {
-    id: 'wk-3',
-    name: 'Full Body Strength',
-    description: 'Complete strength training routine targeting all major muscle groups',
-    duration: 60,
-    difficulty: 'intermediate',
-    equipment: 'free-weights',
-    calories: 350,
-    images: ['/images/workout1.jpg'],
-    createdBy: 'Martell Chen',
-    createdById: 'pt-1'
-  }
+// Options for filters and forms
+const DIFFICULTY_OPTIONS: { value: WorkoutDifficultyEnum; label: string }[] = [
+  { value: 'BEGINNER', label: 'Beginner' },
+  { value: 'INTERMEDIATE', label: 'Intermediate' },
+  { value: 'ADVANCED', label: 'Advanced' }
 ];
 
-const EQUIPMENT_OPTIONS: { value: EquipmentType; label: string }[] = [
-  { value: 'none', label: 'None' },
-  { value: 'cardio', label: 'Cardio' },
-  { value: 'free-weights', label: 'Free Weights' },
-  { value: 'strength', label: 'Strength' }
+const TYPE_OPTIONS: { value: WorkoutTypeEnum; label: string }[] = [
+  { value: 'Strength', label: 'Strength' },
+  { value: 'Cardio', label: 'Cardio' },
+  { value: 'HIIT', label: 'HIIT' },
+  { value: 'Core', label: 'Core' },
+  { value: 'Flexibility', label: 'Flexibility' }
 ];
 
-const DIFFICULTY_OPTIONS: { value: WorkoutDifficulty; label: string }[] = [
-  { value: 'beginner', label: 'Beginner' },
-  { value: 'intermediate', label: 'Intermediate' },
-  { value: 'advanced', label: 'Advanced' }
-];
+// Helper functions
+const getDifficultyBadge = (difficulty: WorkoutDifficultyEnum) => {
+  const config: Record<WorkoutDifficultyEnum, { label: string; className: string }> = {
+    'BEGINNER': { label: 'Beginner', className: 'workouts__badge--beginner' },
+    'INTERMEDIATE': { label: 'Intermediate', className: 'workouts__badge--intermediate' },
+    'ADVANCED': { label: 'Advanced', className: 'workouts__badge--advanced' }
+  };
+  return config[difficulty] || { label: difficulty, className: '' };
+};
 
-function Workouts({ userRole, currentUserId }: WorkoutsProps) {
+const getTypeBadge = (type: WorkoutTypeEnum) => {
+  const config: Record<WorkoutTypeEnum, { label: string; className: string }> = {
+    'Strength': { label: 'Strength', className: 'workouts__type--strength' },
+    'Cardio': { label: 'Cardio', className: 'workouts__type--cardio' },
+    'HIIT': { label: 'HIIT', className: 'workouts__type--hiit' },
+    'Core': { label: 'Core', className: 'workouts__type--core' },
+    'Flexibility': { label: 'Flexibility', className: 'workouts__type--flexibility' }
+  };
+  return config[type] || { label: type, className: '' };
+};
+
+function Workouts({ userRole }: WorkoutsProps) {
+  const { showToast } = useToast();
+  
+  // Data state
+  const [workouts, setWorkouts] = useState<ApiWorkout[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Filter state
   const [searchTerm, setSearchTerm] = useState('');
+  const [difficultyFilter, setDifficultyFilter] = useState<WorkoutDifficultyEnum | 'all'>('all');
+  const [typeFilter, setTypeFilter] = useState<WorkoutTypeEnum | 'all'>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
   
+  // Modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [_selectedWorkout, setSelectedWorkout] = useState<Workout | null>(null);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedWorkout, setSelectedWorkout] = useState<ApiWorkout | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     duration: 0,
-    difficulty: '' as WorkoutDifficulty | '',
-    equipment: '' as EquipmentType | '',
-    images: [] as string[]
+    difficulty: '' as WorkoutDifficultyEnum | '',
+    type: '' as WorkoutTypeEnum | ''
   });
 
-  const stats = {
-    totalWorkouts: mockWorkouts.length,
-    categories: new Set(mockWorkouts.map(w => w.equipment)).size,
-    avgDuration: Math.round(mockWorkouts.reduce((sum, w) => sum + w.duration, 0) / mockWorkouts.length),
-    avgCalories: Math.round(mockWorkouts.reduce((sum, w) => sum + w.calories, 0) / mockWorkouts.length)
+  // Fetch workouts on mount
+  useEffect(() => {
+    fetchWorkouts();
+  }, []);
+
+  const fetchWorkouts = async () => {
+    setIsLoading(true);
+    try {
+      const response = await workoutApi.getAll();
+      setWorkouts(response.data);
+    } catch (error) {
+      console.error('Failed to fetch workouts:', error);
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: 'Không thể tải danh sách bài tập'
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
+  // Filter and sort workouts
   const getFilteredWorkouts = () => {
-    let filtered = mockWorkouts;
+    let filtered = [...workouts];
 
+    // Apply search filter
     if (searchTerm) {
+      const term = searchTerm.toLowerCase();
       filtered = filtered.filter(w => 
-        w.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        w.createdBy.toLowerCase().includes(searchTerm.toLowerCase())
+        w.name.toLowerCase().includes(term) ||
+        w.description.toLowerCase().includes(term)
       );
     }
+
+    // Apply difficulty filter
+    if (difficultyFilter !== 'all') {
+      filtered = filtered.filter(w => w.difficulty === difficultyFilter);
+    }
+
+    // Apply type filter
+    if (typeFilter !== 'all') {
+      filtered = filtered.filter(w => w.type === typeFilter);
+    }
+
+    // Sort
+    filtered.sort((a, b) => {
+      const dateA = new Date(a.createdAt).getTime();
+      const dateB = new Date(b.createdAt).getTime();
+      return sortBy === 'newest' ? dateB - dateA : dateA - dateB;
+    });
 
     return filtered;
   };
 
   const filteredWorkouts = getFilteredWorkouts();
 
-  const canEditWorkout = (workout: Workout) => {
-    if (userRole === 'admin') return true;
-    return workout.createdById === currentUserId;
+  // Stats
+  const stats = {
+    totalWorkouts: workouts.length,
+    types: new Set(workouts.map(w => w.type)).size,
+    avgDuration: workouts.length > 0 
+      ? Math.round(workouts.reduce((sum, w) => sum + w.duration, 0) / workouts.length) 
+      : 0,
+    byDifficulty: {
+      beginner: workouts.filter(w => w.difficulty === 'BEGINNER').length,
+      intermediate: workouts.filter(w => w.difficulty === 'INTERMEDIATE').length,
+      advanced: workouts.filter(w => w.difficulty === 'ADVANCED').length
+    }
   };
 
-  const handleEdit = (workout: Workout) => {
+  const handleView = (workout: ApiWorkout) => {
+    setSelectedWorkout(workout);
+    setShowViewModal(true);
+  };
+
+  const handleEdit = (workout: ApiWorkout) => {
     setSelectedWorkout(workout);
     setFormData({
       name: workout.name,
       description: workout.description,
       duration: workout.duration,
       difficulty: workout.difficulty,
-      equipment: workout.equipment,
-      images: workout.images || []
+      type: workout.type
     });
     setShowEditModal(true);
   };
 
-  const handleDelete = (workout: Workout) => {
-    if (confirm(`Are you sure you want to delete "${workout.name}"?`)) {
-      console.log('Deleting workout:', workout.id);
+  const handleDeleteClick = (workout: ApiWorkout) => {
+    setSelectedWorkout(workout);
+    setShowDeleteModal(true);
+  };
+
+  const handleCreateWorkout = async () => {
+    if (!formData.name || !formData.description || !formData.difficulty || !formData.type || formData.duration <= 0) {
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: 'Vui lòng điền đầy đủ thông tin bắt buộc'
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const requestData: ReqCreateWorkoutDTO = {
+        name: formData.name,
+        description: formData.description,
+        duration: formData.duration,
+        difficulty: formData.difficulty as WorkoutDifficultyEnum,
+        type: formData.type as WorkoutTypeEnum
+      };
+
+      await workoutApi.create(requestData);
+      
+      showToast({
+        type: 'success',
+        title: 'Thành công',
+        message: 'Đã tạo bài tập mới'
+      });
+
+      setShowCreateModal(false);
+      resetForm();
+      fetchWorkouts();
+    } catch (error: unknown) {
+      console.error('Failed to create workout:', error);
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: axiosError.response?.data?.message || 'Không thể tạo bài tập'
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleCreateWorkout = () => {
-    console.log('Creating workout:', formData);
-    setShowCreateModal(false);
-    resetForm();
+  const handleUpdateWorkout = async () => {
+    if (!selectedWorkout) return;
+
+    setIsSubmitting(true);
+    try {
+      const requestData: ReqUpdateWorkoutDTO = {
+        name: formData.name,
+        description: formData.description,
+        duration: formData.duration,
+        difficulty: formData.difficulty as WorkoutDifficultyEnum,
+        type: formData.type as WorkoutTypeEnum
+      };
+
+      await workoutApi.update(selectedWorkout.id, requestData);
+      
+      showToast({
+        type: 'success',
+        title: 'Thành công',
+        message: 'Đã cập nhật bài tập'
+      });
+
+      setShowEditModal(false);
+      resetForm();
+      fetchWorkouts();
+    } catch (error: unknown) {
+      console.error('Failed to update workout:', error);
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: axiosError.response?.data?.message || 'Không thể cập nhật bài tập'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleUpdateWorkout = () => {
-    console.log('Updating workout:', formData);
-    setShowEditModal(false);
-    resetForm();
+  const handleDeleteWorkout = async () => {
+    if (!selectedWorkout) return;
+
+    setIsSubmitting(true);
+    try {
+      await workoutApi.delete(selectedWorkout.id);
+      
+      showToast({
+        type: 'success',
+        title: 'Thành công',
+        message: `Đã xóa bài tập "${selectedWorkout.name}"`
+      });
+
+      setShowDeleteModal(false);
+      setSelectedWorkout(null);
+      fetchWorkouts();
+    } catch (error: unknown) {
+      console.error('Failed to delete workout:', error);
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: axiosError.response?.data?.message || 'Không thể xóa bài tập'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const resetForm = () => {
@@ -143,23 +292,26 @@ function Workouts({ userRole, currentUserId }: WorkoutsProps) {
       description: '',
       duration: 0,
       difficulty: '',
-      equipment: '',
-      images: []
+      type: ''
     });
     setSelectedWorkout(null);
   };
 
-  const getEquipmentLabel = (equipment: EquipmentType) => {
-    return EQUIPMENT_OPTIONS.find(e => e.value === equipment)?.label || equipment;
-  };
-
   const renderFooter = (onCancel: () => void, onSubmit: () => void, submitLabel: string) => (
     <>
-      <button className="modal-form__btn modal-form__btn--secondary" onClick={onCancel}>
+      <button 
+        className="modal-form__btn modal-form__btn--secondary" 
+        onClick={onCancel}
+        disabled={isSubmitting}
+      >
         Cancel
       </button>
-      <button className="modal-form__btn modal-form__btn--primary" onClick={onSubmit}>
-        {submitLabel}
+      <button 
+        className="modal-form__btn modal-form__btn--primary" 
+        onClick={onSubmit}
+        disabled={isSubmitting}
+      >
+        {isSubmitting ? 'Processing...' : submitLabel}
       </button>
     </>
   );
@@ -171,9 +323,21 @@ function Workouts({ userRole, currentUserId }: WorkoutsProps) {
           <h1 className="workouts__title">Workouts</h1>
           <p className="workouts__subtitle">Manage workout programs and exercises</p>
         </div>
-        <button className="workouts__add-btn" onClick={() => setShowCreateModal(true)}>
-          + Create Workout
-        </button>
+        <div className="workouts__header-actions">
+          <button 
+            className="workouts__refresh-btn" 
+            onClick={fetchWorkouts}
+            disabled={isLoading}
+            title="Refresh"
+          >
+            <RefreshCw size={18} className={isLoading ? 'spinning' : ''} />
+          </button>
+          {userRole === 'admin' && (
+            <button className="workouts__add-btn" onClick={() => setShowCreateModal(true)}>
+              + Create Workout
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Stats */}
@@ -183,16 +347,24 @@ function Workouts({ userRole, currentUserId }: WorkoutsProps) {
           <span className="workouts__stat-value">{stats.totalWorkouts}</span>
         </div>
         <div className="workouts__stat">
-          <span className="workouts__stat-label">Categories</span>
-          <span className="workouts__stat-value">{stats.categories}</span>
+          <span className="workouts__stat-label">Types</span>
+          <span className="workouts__stat-value">{stats.types}</span>
         </div>
         <div className="workouts__stat">
           <span className="workouts__stat-label">Avg. duration</span>
           <span className="workouts__stat-value">{stats.avgDuration} min</span>
         </div>
         <div className="workouts__stat">
-          <span className="workouts__stat-label">Avg. Calories burnt</span>
-          <span className="workouts__stat-value">{stats.avgCalories}</span>
+          <span className="workouts__stat-label">Beginner</span>
+          <span className="workouts__stat-value">{stats.byDifficulty.beginner}</span>
+        </div>
+        <div className="workouts__stat">
+          <span className="workouts__stat-label">Intermediate</span>
+          <span className="workouts__stat-value">{stats.byDifficulty.intermediate}</span>
+        </div>
+        <div className="workouts__stat">
+          <span className="workouts__stat-label">Advanced</span>
+          <span className="workouts__stat-value">{stats.byDifficulty.advanced}</span>
         </div>
       </div>
 
@@ -202,12 +374,36 @@ function Workouts({ userRole, currentUserId }: WorkoutsProps) {
           <Search size={18} />
           <input
             type="text"
-            placeholder="Search by workout or creator name..."
+            placeholder="Search by workout name or description..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
         <div className="workouts__filter-group">
+          <div className="workouts__select-wrapper">
+            <select 
+              value={difficultyFilter} 
+              onChange={(e) => setDifficultyFilter(e.target.value as WorkoutDifficultyEnum | 'all')}
+            >
+              <option value="all">All Difficulty</option>
+              {DIFFICULTY_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <ChevronDown size={16} />
+          </div>
+          <div className="workouts__select-wrapper">
+            <select 
+              value={typeFilter} 
+              onChange={(e) => setTypeFilter(e.target.value as WorkoutTypeEnum | 'all')}
+            >
+              <option value="all">All Types</option>
+              {TYPE_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <ChevronDown size={16} />
+          </div>
           <div className="workouts__select-wrapper">
             <select value={sortBy} onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest')}>
               <option value="newest">Newest</option>
@@ -218,62 +414,85 @@ function Workouts({ userRole, currentUserId }: WorkoutsProps) {
         </div>
       </div>
 
-      {/* Workout Cards Grid */}
-      <div className="workouts__grid">
-        {filteredWorkouts.map((workout) => (
-          <div key={workout.id} className="workouts__card">
-            <div className="workouts__card-header">
-              <div className="workouts__card-icon">
-                <Dumbbell size={24} />
-              </div>
-              <div className="workouts__card-title-section">
-                <h3 className="workouts__card-name">{workout.name}</h3>
-                <p className="workouts__card-author">by {workout.createdBy}</p>
-              </div>
-              {canEditWorkout(workout) && (
-                <div className="workouts__card-actions">
-                  <button 
-                    className="workouts__card-action"
-                    onClick={() => handleEdit(workout)}
-                    title="Edit"
-                  >
-                    <Pencil size={16} />
-                  </button>
-                  <button 
-                    className="workouts__card-action workouts__card-action--delete"
-                    onClick={() => handleDelete(workout)}
-                    title="Delete"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+      {/* Loading State */}
+      {isLoading ? (
+        <div className="workouts__loading">
+          <RefreshCw size={32} className="spinning" />
+          <p>Loading workouts...</p>
+        </div>
+      ) : filteredWorkouts.length === 0 ? (
+        <div className="workouts__empty">
+          <Dumbbell size={48} />
+          <h3>No workouts found</h3>
+          <p>Try adjusting your filters or create a new workout.</p>
+        </div>
+      ) : (
+        /* Workout Cards Grid */
+        <div className="workouts__grid">
+          {filteredWorkouts.map((workout) => {
+            const difficultyBadge = getDifficultyBadge(workout.difficulty);
+            const typeBadge = getTypeBadge(workout.type);
+            
+            return (
+              <div key={workout.id} className="workouts__card">
+                <div className="workouts__card-header">
+                  <div className="workouts__card-icon">
+                    <Dumbbell size={24} />
+                  </div>
+                  <div className="workouts__card-title-section">
+                    <h3 className="workouts__card-name">{workout.name}</h3>
+                    <span className={`workouts__card-type ${typeBadge.className}`}>
+                      {typeBadge.label}
+                    </span>
+                  </div>
+                  <div className="workouts__card-actions">
+                    <button 
+                      className="workouts__card-action"
+                      onClick={() => handleView(workout)}
+                      title="View Details"
+                    >
+                      <Eye size={16} />
+                    </button>
+                    {userRole === 'admin' && (
+                      <>
+                        <button 
+                          className="workouts__card-action"
+                          onClick={() => handleEdit(workout)}
+                          title="Edit"
+                        >
+                          <Pencil size={16} />
+                        </button>
+                        <button 
+                          className="workouts__card-action workouts__card-action--delete"
+                          onClick={() => handleDeleteClick(workout)}
+                          title="Delete"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
 
-            <p className="workouts__card-description">{workout.description}</p>
+                <p className="workouts__card-description">{workout.description}</p>
 
-            <div className="workouts__card-equipment">
-              <span className="workouts__card-equipment-label">Equipment required</span>
-              <span className="workouts__card-equipment-value">
-                {getEquipmentLabel(workout.equipment)}
-              </span>
-            </div>
+                <div className="workouts__card-badges">
+                  <span className={`workouts__badge ${difficultyBadge.className}`}>
+                    {difficultyBadge.label}
+                  </span>
+                </div>
 
-            <div className="workouts__card-footer">
-              <div className="workouts__card-metric">
-                <Clock size={16} />
-                <span className="workouts__card-metric-label">Duration</span>
-                <span className="workouts__card-metric-value">{workout.duration} min</span>
+                <div className="workouts__card-footer">
+                  <div className="workouts__card-metric">
+                    <Clock size={16} />
+                    <span className="workouts__card-metric-value">{workout.duration} min</span>
+                  </div>
+                </div>
               </div>
-              <div className="workouts__card-metric">
-                <Flame size={16} />
-                <span className="workouts__card-metric-label">Calories</span>
-                <span className="workouts__card-metric-value">~{workout.calories}</span>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Create Workout Modal */}
       <Modal
@@ -293,7 +512,7 @@ function Workouts({ userRole, currentUserId }: WorkoutsProps) {
             <input
               type="text"
               className="modal-form__input"
-              placeholder="e.g. Bench Press"
+              placeholder="e.g. Push-ups, Squats, Bench Press..."
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             />
@@ -303,32 +522,34 @@ function Workouts({ userRole, currentUserId }: WorkoutsProps) {
             <label className="modal-form__label modal-form__label--required">Description</label>
             <textarea
               className="modal-form__textarea"
-              placeholder="Brief introduction about the workout..."
+              placeholder="Describe the workout, target muscles, and proper form..."
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              rows={4}
             />
           </div>
 
           <div className="modal-form__row">
             <div className="modal-form__group">
-              <label className="modal-form__label modal-form__label--required">Duration</label>
+              <label className="modal-form__label modal-form__label--required">Duration (minutes)</label>
               <input
                 type="number"
                 className="modal-form__input"
-                placeholder="0"
+                placeholder="30"
+                min="1"
                 value={formData.duration || ''}
                 onChange={(e) => setFormData({ ...formData, duration: Number(e.target.value) })}
               />
             </div>
             <div className="modal-form__group">
-              <label className="modal-form__label modal-form__label--required">Difficulty</label>
+              <label className="modal-form__label modal-form__label--required">Type</label>
               <select
                 className="modal-form__select"
-                value={formData.difficulty}
-                onChange={(e) => setFormData({ ...formData, difficulty: e.target.value as WorkoutDifficulty })}
+                value={formData.type}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value as WorkoutTypeEnum })}
               >
                 <option value="">Select Type</option>
-                {DIFFICULTY_OPTIONS.map(opt => (
+                {TYPE_OPTIONS.map(opt => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
@@ -336,29 +557,14 @@ function Workouts({ userRole, currentUserId }: WorkoutsProps) {
           </div>
 
           <div className="modal-form__group">
-            <label className="modal-form__label">Workout images</label>
-            <div className="workouts__image-upload">
-              <div className="workouts__image-preview">
-                <img src="/images/placeholder.jpg" alt="Preview" />
-              </div>
-              <div className="workouts__image-dropzone">
-                <Upload size={24} />
-                <span>Click to upload or drag and drop</span>
-                <span className="workouts__image-hint">PNG, JPG, JPEG Up to 5MB</span>
-              </div>
-            </div>
-            <span className="modal-form__hint">Recommended: Square image, minimum 300x300px for best quality</span>
-          </div>
-
-          <div className="modal-form__group">
-            <label className="modal-form__label">Type of Equipment Required (optional)</label>
+            <label className="modal-form__label modal-form__label--required">Difficulty</label>
             <select
               className="modal-form__select"
-              value={formData.equipment}
-              onChange={(e) => setFormData({ ...formData, equipment: e.target.value as EquipmentType })}
+              value={formData.difficulty}
+              onChange={(e) => setFormData({ ...formData, difficulty: e.target.value as WorkoutDifficultyEnum })}
             >
-              <option value="">Select Type</option>
-              {EQUIPMENT_OPTIONS.map(opt => (
+              <option value="">Select Difficulty</option>
+              {DIFFICULTY_OPTIONS.map(opt => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
@@ -375,7 +581,7 @@ function Workouts({ userRole, currentUserId }: WorkoutsProps) {
         footer={renderFooter(
           () => { setShowEditModal(false); resetForm(); },
           handleUpdateWorkout,
-          'Confirm'
+          'Update Workout'
         )}
       >
         <div className="modal-form">
@@ -395,28 +601,30 @@ function Workouts({ userRole, currentUserId }: WorkoutsProps) {
               className="modal-form__textarea"
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              rows={4}
             />
           </div>
 
           <div className="modal-form__row">
             <div className="modal-form__group">
-              <label className="modal-form__label modal-form__label--required">Duration</label>
+              <label className="modal-form__label modal-form__label--required">Duration (minutes)</label>
               <input
                 type="number"
                 className="modal-form__input"
+                min="1"
                 value={formData.duration}
                 onChange={(e) => setFormData({ ...formData, duration: Number(e.target.value) })}
               />
             </div>
             <div className="modal-form__group">
-              <label className="modal-form__label modal-form__label--required">Difficulty</label>
+              <label className="modal-form__label modal-form__label--required">Type</label>
               <select
                 className="modal-form__select"
-                value={formData.difficulty}
-                onChange={(e) => setFormData({ ...formData, difficulty: e.target.value as WorkoutDifficulty })}
+                value={formData.type}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value as WorkoutTypeEnum })}
               >
                 <option value="">Select Type</option>
-                {DIFFICULTY_OPTIONS.map(opt => (
+                {TYPE_OPTIONS.map(opt => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
@@ -424,40 +632,88 @@ function Workouts({ userRole, currentUserId }: WorkoutsProps) {
           </div>
 
           <div className="modal-form__group">
-            <label className="modal-form__label">Workout images</label>
-            <div className="workouts__image-upload workouts__image-upload--edit">
-              {formData.images.length > 0 ? (
-                <>
-                  {formData.images.map((img, index) => (
-                    <div key={index} className="workouts__image-item">
-                      <img src={img} alt={`Workout ${index + 1}`} />
-                      <button className="workouts__image-remove">×</button>
-                    </div>
-                  ))}
-                </>
-              ) : null}
-              <div className="workouts__image-add">
-                <Upload size={24} />
-              </div>
-            </div>
-            <span className="modal-form__hint">Recommended: Square image, minimum 300x300px for best quality</span>
-          </div>
-
-          <div className="modal-form__group">
-            <label className="modal-form__label">Type of Equipment Required (optional)</label>
+            <label className="modal-form__label modal-form__label--required">Difficulty</label>
             <select
               className="modal-form__select"
-              value={formData.equipment}
-              onChange={(e) => setFormData({ ...formData, equipment: e.target.value as EquipmentType })}
+              value={formData.difficulty}
+              onChange={(e) => setFormData({ ...formData, difficulty: e.target.value as WorkoutDifficultyEnum })}
             >
-              <option value="">Select Type</option>
-              {EQUIPMENT_OPTIONS.map(opt => (
+              <option value="">Select Difficulty</option>
+              {DIFFICULTY_OPTIONS.map(opt => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
           </div>
         </div>
       </Modal>
+
+      {/* View Workout Modal */}
+      <Modal
+        isOpen={showViewModal}
+        onClose={() => { setShowViewModal(false); setSelectedWorkout(null); }}
+        title="Workout Details"
+        size="md"
+      >
+        {selectedWorkout && (
+          <div className="workouts__view-modal">
+            <div className="workouts__view-header">
+              <div className="workouts__view-icon">
+                <Dumbbell size={32} />
+              </div>
+              <div className="workouts__view-title">
+                <h3>{selectedWorkout.name}</h3>
+                <div className="workouts__view-badges">
+                  <span className={`workouts__card-type ${getTypeBadge(selectedWorkout.type).className}`}>
+                    {getTypeBadge(selectedWorkout.type).label}
+                  </span>
+                  <span className={`workouts__badge ${getDifficultyBadge(selectedWorkout.difficulty).className}`}>
+                    {getDifficultyBadge(selectedWorkout.difficulty).label}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="workouts__view-section">
+              <h4>Description</h4>
+              <p>{selectedWorkout.description}</p>
+            </div>
+
+            <div className="workouts__view-grid">
+              <div className="workouts__view-item">
+                <span className="workouts__view-label">Duration</span>
+                <span className="workouts__view-value">{selectedWorkout.duration} minutes</span>
+              </div>
+              <div className="workouts__view-item">
+                <span className="workouts__view-label">Type</span>
+                <span className="workouts__view-value">{selectedWorkout.type}</span>
+              </div>
+              <div className="workouts__view-item">
+                <span className="workouts__view-label">Difficulty</span>
+                <span className="workouts__view-value">{selectedWorkout.difficulty}</span>
+              </div>
+              <div className="workouts__view-item">
+                <span className="workouts__view-label">Created At</span>
+                <span className="workouts__view-value">
+                  {new Date(selectedWorkout.createdAt).toLocaleDateString('vi-VN')}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => { setShowDeleteModal(false); setSelectedWorkout(null); }}
+        onConfirm={handleDeleteWorkout}
+        title="Delete Workout"
+        message={`Are you sure you want to delete "${selectedWorkout?.name}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={isSubmitting}
+      />
     </div>
   );
 }

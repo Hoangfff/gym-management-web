@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button, Input, Checkbox } from '../../components/ui/index.ts';
+import { authApi } from '../../services/index.ts';
 import './LoginPage.css';
 
 interface LoginFormData {
-  email: string;
+  username: string;
   password: string;
   rememberMe: boolean;
 }
@@ -12,10 +13,12 @@ interface LoginFormData {
 function LoginPage() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState<LoginFormData>({
-    email: '',
+    username: '',
     password: '',
     rememberMe: false,
   });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -23,12 +26,56 @@ function LoginPage() {
       ...prev,
       [name]: type === 'checkbox' ? checked : value,
     }));
+    // Clear error when user types
+    if (error) setError(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Login submitted:', formData);
-    // TODO: Implement login logic
+    
+    if (!formData.username || !formData.password) {
+      setError('Please enter both username and password');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await authApi.login({
+        username: formData.username,
+        password: formData.password
+      });
+
+      if (response.data) {
+        const { token, user } = response.data;
+        
+        // Store token
+        if (formData.rememberMe) {
+          localStorage.setItem('accessToken', token);
+          localStorage.setItem('user', JSON.stringify(user));
+        } else {
+          sessionStorage.setItem('accessToken', token);
+          sessionStorage.setItem('user', JSON.stringify(user));
+        }
+
+        // Navigate based on user role
+        const role = user.role?.toLowerCase();
+        if (role === 'ADMIN') {
+          navigate('/admin');
+        } else if (role === 'PT' || role === 'personal_trainer') {
+          navigate('/pt');
+        } else {
+          navigate('/');
+        }
+      }
+    } catch (err: unknown) {
+      console.error('Login failed:', err);
+      const axiosError = err as { response?: { data?: { message?: string } } };
+      setError(axiosError.response?.data?.message || 'Login failed. Please check your credentials.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -49,15 +96,22 @@ function LoginPage() {
             <h1 className="auth-title">Sign in</h1>
           </div>
 
+          {error && (
+            <div className="auth-error">
+              {error}
+            </div>
+          )}
+
           <form className="auth-form" onSubmit={handleSubmit}>
             <Input
-              label="Email"
-              type="email"
-              name="email"
-              value={formData.email}
+              label="Username"
+              type="text"
+              name="username"
+              value={formData.username}
               onChange={handleInputChange}
               required
-              placeholder="example@gmail.com"
+              placeholder="Enter your username"
+              disabled={isLoading}
             />
 
             <Input
@@ -69,6 +123,7 @@ function LoginPage() {
               showPasswordToggle
               required
               placeholder="********"
+              disabled={isLoading}
             />
 
             <div className="auth-options">
@@ -78,6 +133,7 @@ function LoginPage() {
                 checked={formData.rememberMe}
                 onChange={handleInputChange}
                 label="Remember me"
+                disabled={isLoading}
               />
               <Link to="/forgot-password" className="auth-link">
                 Forgot Password?
@@ -85,8 +141,14 @@ function LoginPage() {
             </div>
 
             <div className="auth-footer">
-              <Button type="submit" variant="primary" fullWidth size="lg">
-                Login
+              <Button 
+                type="submit" 
+                variant="primary" 
+                fullWidth 
+                size="lg"
+                disabled={isLoading}
+              >
+                {isLoading ? 'Signing in...' : 'Login'}
               </Button>
             </div>
           </form>

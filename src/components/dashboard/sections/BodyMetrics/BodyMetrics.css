@@ -57,20 +57,22 @@
 .body-metrics__create-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 20px;
-  background: var(--primary-color, #6366f1);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-weight: 500;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md) var(--spacing-xl);
+  background-color: var(--color-white);
+  color: var(--color-primary);
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  font-family: var(--font-primary);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--transition-fast);
 }
 
 .body-metrics__create-btn:hover {
-  background: var(--primary-dark, #4f46e5);
-  transform: translateY(-1px);
+  background-color: var(--color-primary);
+  color: var(--color-white);
 }
 
 /* Stats */

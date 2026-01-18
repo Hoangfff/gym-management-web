@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Search, ChevronDown, Pencil, Trash2, Star, Eye, RefreshCw, UserCheck, UserX } from 'lucide-react';
+import { Search, ChevronDown, Pencil, Trash2, Star, Eye, RefreshCw, UserCheck, UserX, FileText } from 'lucide-react';
 import Modal from '../../Modal/index.ts';
 import { ConfirmModal, useToast } from '../../../ui/index.ts';
-import { ptApi } from '../../../../services/index.ts';
-import type { ApiPersonalTrainer, GenderEnum, PTStatusEnum, ReqCreatePTDTO, ReqUpdatePTDTO } from '../../../../types/api.ts';
+import { ptApi, contractApi } from '../../../../services/index.ts';
+import type { ApiPersonalTrainer, GenderEnum, PTStatusEnum, ReqCreatePTDTO, ReqUpdatePTDTO, ApiContract, ContractStatusEnum } from '../../../../types/api.ts';
 import './PersonalTrainers.css';
 
 const SPECIALIZATION_OPTIONS = [
@@ -45,8 +45,11 @@ function PersonalTrainers() {
 
   // Data state
   const [trainers, setTrainers] = useState<ApiPersonalTrainer[]>([]);
+  const [ptContracts, setPtContracts] = useState<ApiContract[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingContracts, setIsLoadingContracts] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [viewModalTab, setViewModalTab] = useState<'details' | 'contracts'>('details');
 
   // Filter state
   const [searchTerm, setSearchTerm] = useState('');
@@ -99,6 +102,35 @@ function PersonalTrainers() {
     }
   };
 
+  const fetchPtContracts = async (ptId: number) => {
+    setIsLoadingContracts(true);
+    try {
+      const response = await contractApi.getByPtId(ptId);
+      setPtContracts(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.error('Failed to fetch PT contracts:', error);
+      setPtContracts([]);
+    } finally {
+      setIsLoadingContracts(false);
+    }
+  };
+
+  const getContractStatusClass = (status: ContractStatusEnum) => {
+    switch (status) {
+      case 'ACTIVE': return 'trainers__contract-status--active';
+      case 'EXPIRED': return 'trainers__contract-status--expired';
+      case 'CANCELLED': return 'trainers__contract-status--cancelled';
+      default: return '';
+    }
+  };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND'
+    }).format(value);
+  };
+
   // Stats
   const stats = {
     totalTrainers: trainers.length,
@@ -141,11 +173,15 @@ function PersonalTrainers() {
     try {
       const response = await ptApi.search({ ptId: trainer.id });
       setSelectedTrainer(response.data);
+      setViewModalTab('details');
       setShowViewModal(true);
+      fetchPtContracts(trainer.id);
     } catch (error) {
       console.error('Failed to fetch trainer details:', error);
       setSelectedTrainer(trainer);
+      setViewModalTab('details');
       setShowViewModal(true);
+      fetchPtContracts(trainer.id);
     }
   };
 
@@ -901,7 +937,12 @@ function PersonalTrainers() {
       {/* View Trainer Details Modal */}
       <Modal
         isOpen={showViewModal}
-        onClose={() => { setShowViewModal(false); setSelectedTrainer(null); }}
+        onClose={() => { 
+          setShowViewModal(false); 
+          setSelectedTrainer(null); 
+          setPtContracts([]);
+          setViewModalTab('details');
+        }}
         title="Trainer Details"
         size="md"
       >
@@ -932,54 +973,143 @@ function PersonalTrainers() {
               </div>
             </div>
 
-            <div className="trainers__view-grid">
-              <div className="trainers__view-item">
-                <span className="trainers__view-label">PT ID</span>
-                <span className="trainers__view-value">#{selectedTrainer.id}</span>
-              </div>
-              <div className="trainers__view-item">
-                <span className="trainers__view-label">Email</span>
-                <span className="trainers__view-value">{selectedTrainer.user.email}</span>
-              </div>
-              <div className="trainers__view-item">
-                <span className="trainers__view-label">Phone</span>
-                <span className="trainers__view-value">{selectedTrainer.user.phoneNumber}</span>
-              </div>
-              <div className="trainers__view-item">
-                <span className="trainers__view-label">Gender</span>
-                <span className="trainers__view-value">{getGenderDisplay(selectedTrainer.user.gender)}</span>
-              </div>
-              <div className="trainers__view-item">
-                <span className="trainers__view-label">Date of Birth</span>
-                <span className="trainers__view-value">{formatDateDisplay(selectedTrainer.user.dob)}</span>
-              </div>
-              <div className="trainers__view-item">
-                <span className="trainers__view-label">Experience</span>
-                <span className="trainers__view-value">{selectedTrainer.experienceYears} years</span>
-              </div>
-              <div className="trainers__view-item trainers__view-item--full">
-                <span className="trainers__view-label">Specialization</span>
-                <span className="trainers__view-value">{selectedTrainer.specialization || '-'}</span>
-              </div>
-              <div className="trainers__view-item trainers__view-item--full">
-                <span className="trainers__view-label">Certifications</span>
-                <span className="trainers__view-value">{selectedTrainer.certifications || '-'}</span>
-              </div>
-              <div className="trainers__view-item trainers__view-item--full">
-                <span className="trainers__view-label">About</span>
-                <span className="trainers__view-value">{selectedTrainer.about || '-'}</span>
-              </div>
-              {selectedTrainer.note && (
-                <div className="trainers__view-item trainers__view-item--full">
-                  <span className="trainers__view-label">Notes</span>
-                  <span className="trainers__view-value">{selectedTrainer.note}</span>
-                </div>
-              )}
-              <div className="trainers__view-item">
-                <span className="trainers__view-label">Created At</span>
-                <span className="trainers__view-value">{new Date(selectedTrainer.createdAt).toLocaleString('vi-VN')}</span>
-              </div>
+            {/* Tabs */}
+            <div className="trainers__view-tabs">
+              <button
+                className={`trainers__view-tab ${viewModalTab === 'details' ? 'trainers__view-tab--active' : ''}`}
+                onClick={() => setViewModalTab('details')}
+              >
+                Details
+              </button>
+              <button
+                className={`trainers__view-tab ${viewModalTab === 'contracts' ? 'trainers__view-tab--active' : ''}`}
+                onClick={() => setViewModalTab('contracts')}
+              >
+                <FileText size={16} />
+                Contracts ({ptContracts.length})
+              </button>
             </div>
+
+            {/* Details Tab */}
+            {viewModalTab === 'details' && (
+              <div className="trainers__view-grid">
+                <div className="trainers__view-item">
+                  <span className="trainers__view-label">PT ID</span>
+                  <span className="trainers__view-value">#{selectedTrainer.id}</span>
+                </div>
+                <div className="trainers__view-item">
+                  <span className="trainers__view-label">Email</span>
+                  <span className="trainers__view-value">{selectedTrainer.user.email}</span>
+                </div>
+                <div className="trainers__view-item">
+                  <span className="trainers__view-label">Phone</span>
+                  <span className="trainers__view-value">{selectedTrainer.user.phoneNumber}</span>
+                </div>
+                <div className="trainers__view-item">
+                  <span className="trainers__view-label">Gender</span>
+                  <span className="trainers__view-value">{getGenderDisplay(selectedTrainer.user.gender)}</span>
+                </div>
+                <div className="trainers__view-item">
+                  <span className="trainers__view-label">Date of Birth</span>
+                  <span className="trainers__view-value">{formatDateDisplay(selectedTrainer.user.dob)}</span>
+                </div>
+                <div className="trainers__view-item">
+                  <span className="trainers__view-label">Experience</span>
+                  <span className="trainers__view-value">{selectedTrainer.experienceYears} years</span>
+                </div>
+                <div className="trainers__view-item trainers__view-item--full">
+                  <span className="trainers__view-label">Specialization</span>
+                  <span className="trainers__view-value">{selectedTrainer.specialization || '-'}</span>
+                </div>
+                <div className="trainers__view-item trainers__view-item--full">
+                  <span className="trainers__view-label">Certifications</span>
+                  <span className="trainers__view-value">{selectedTrainer.certifications || '-'}</span>
+                </div>
+                <div className="trainers__view-item trainers__view-item--full">
+                  <span className="trainers__view-label">About</span>
+                  <span className="trainers__view-value">{selectedTrainer.about || '-'}</span>
+                </div>
+                {selectedTrainer.note && (
+                  <div className="trainers__view-item trainers__view-item--full">
+                    <span className="trainers__view-label">Notes</span>
+                    <span className="trainers__view-value">{selectedTrainer.note}</span>
+                  </div>
+                )}
+                <div className="trainers__view-item">
+                  <span className="trainers__view-label">Created At</span>
+                  <span className="trainers__view-value">{new Date(selectedTrainer.createdAt).toLocaleString('vi-VN')}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Contracts Tab */}
+            {viewModalTab === 'contracts' && (
+              <div className="trainers__contracts-tab">
+                {isLoadingContracts ? (
+                  <div className="trainers__contracts-loading">
+                    <RefreshCw size={24} className="spinning" />
+                    <p>Loading contracts...</p>
+                  </div>
+                ) : ptContracts.length === 0 ? (
+                  <div className="trainers__contracts-empty">
+                    <FileText size={48} />
+                    <h4>No contracts found</h4>
+                    <p>This trainer has no assigned contracts yet.</p>
+                  </div>
+                ) : (
+                  <div className="trainers__contracts-list">
+                    {ptContracts.map((contract) => (
+                      <div key={contract.id} className="trainers__contract-card">
+                        <div className="trainers__contract-header">
+                          <span className="trainers__contract-id">
+                            Contract #{contract.id}
+                          </span>
+                          <span className={`trainers__contract-status ${getContractStatusClass(contract.status)}`}>
+                            {contract.status}
+                          </span>
+                        </div>
+                        <div className="trainers__contract-details">
+                          <div className="trainers__contract-item">
+                            <span className="trainers__contract-label">Member</span>
+                            <span className="trainers__contract-value">{contract.memberName}</span>
+                          </div>
+                          <div className="trainers__contract-item">
+                            <span className="trainers__contract-label">Package</span>
+                            <span className="trainers__contract-value">{contract.packageName}</span>
+                          </div>
+                          <div className="trainers__contract-item">
+                            <span className="trainers__contract-label">Price</span>
+                            <span className="trainers__contract-value">{formatCurrency(contract.packagePrice)}</span>
+                          </div>
+                          <div className="trainers__contract-item">
+                            <span className="trainers__contract-label">Duration</span>
+                            <span className="trainers__contract-value">
+                              {formatDateDisplay(contract.startDate)} - {formatDateDisplay(contract.endDate)}
+                            </span>
+                          </div>
+                          <div className="trainers__contract-item">
+                            <span className="trainers__contract-label">Sessions</span>
+                            <span className="trainers__contract-value">
+                              {contract.remainingSessions}/{contract.totalSessions} remaining
+                            </span>
+                          </div>
+                          <div className="trainers__contract-item">
+                            <span className="trainers__contract-label">Signed At</span>
+                            <span className="trainers__contract-value">{formatDateDisplay(contract.signedAt)}</span>
+                          </div>
+                        </div>
+                        {contract.notes && (
+                          <div className="trainers__contract-notes">
+                            <span className="trainers__contract-label">Notes:</span>
+                            <p>{contract.notes}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </Modal>

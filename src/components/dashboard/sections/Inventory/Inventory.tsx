@@ -1,195 +1,324 @@
-import { useState } from 'react';
-import { Pencil, Trash2, Search, Upload, X, Package } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Pencil, Trash2, Search, Eye, RefreshCw, Package, Calendar, Wrench, ChevronDown } from 'lucide-react';
 import Modal from '../../Modal/index.ts';
-import type { InventoryItem, InventoryStatus, InventoryCategory } from '../../../../types/index.ts';
+import { ConfirmModal, useToast } from '../../../ui/index.ts';
+import { workoutDeviceApi } from '../../../../services/index.ts';
+import type { 
+  ApiWorkoutDevice, 
+  ReqCreateWorkoutDeviceDTO, 
+  ReqUpdateWorkoutDeviceDTO 
+} from '../../../../types/api.ts';
 import './Inventory.css';
 
-// Mock data
-const mockInventory: InventoryItem[] = [
-  {
-    id: 'EQ-0001',
-    name: 'Treadmill Pro X500',
-    description: 'Commercial grade treadmill with heart rate monitor and entertainment screen.',
-    category: 'cardio',
-    status: 'in-use',
-    purchaseDate: '2025-01-15',
-    purchasePrice: 2500,
-    currentValue: 2000,
-    location: 'Main Floor - Zone A',
-    quantity: 5,
-    image: '/images/placeholder.jpg'
-  },
-  {
-    id: 'EQ-0002',
-    name: 'Dumbbell Set (5-50 lbs)',
-    description: 'Professional rubber hex dumbbell set with rack.',
-    category: 'free-weights',
-    status: 'in-stock',
-    purchaseDate: '2024-06-20',
-    purchasePrice: 1200,
-    currentValue: 1000,
-    location: 'Free Weights Area',
-    quantity: 2,
-    image: '/images/placeholder.jpg'
-  },
-  {
-    id: 'EQ-0003',
-    name: 'Cable Machine',
-    description: 'Dual adjustable pulley system for various exercises.',
-    category: 'strength',
-    status: 'maintenance',
-    purchaseDate: '2024-03-10',
-    purchasePrice: 3500,
-    currentValue: 2800,
-    location: 'Strength Zone',
-    quantity: 1,
-    maintenanceNotes: 'Cable replacement scheduled',
-    image: '/images/placeholder.jpg'
-  },
-  {
-    id: 'EQ-0004',
-    name: 'Yoga Mat Premium',
-    description: 'Extra thick eco-friendly yoga mat.',
-    category: 'accessories',
-    status: 'in-stock',
-    purchaseDate: '2025-01-01',
-    purchasePrice: 30,
-    currentValue: 30,
-    location: 'Studio B',
-    quantity: 25,
-    image: '/images/placeholder.jpg'
-  }
+// Device type options (API uses string values)
+const TYPE_OPTIONS: { value: string; label: string }[] = [
+  { value: 'Cardio', label: 'Cardio' },
+  { value: 'Strength', label: 'Strength' },
+  { value: 'Free Weights', label: 'Free Weights' },
+  { value: 'Functional', label: 'Functional' },
+  { value: 'Accessories', label: 'Accessories' }
 ];
 
-const CATEGORIES: { value: InventoryCategory | 'all'; label: string }[] = [
-  { value: 'all', label: 'All Categories' },
-  { value: 'cardio', label: 'Cardio' },
-  { value: 'free-weights', label: 'Free Weights' },
-  { value: 'strength', label: 'Strength' },
-  { value: 'accessories', label: 'Accessories' }
-];
+// Helper functions
+const getTypeBadge = (type: string) => {
+  const config: Record<string, { label: string; className: string }> = {
+    'Cardio': { label: 'Cardio', className: 'inventory__type--cardio' },
+    'Strength': { label: 'Strength', className: 'inventory__type--strength' },
+    'Free Weights': { label: 'Free Weights', className: 'inventory__type--freeweights' },
+    'Functional': { label: 'Functional', className: 'inventory__type--functional' },
+    'Accessories': { label: 'Accessories', className: 'inventory__type--accessories' }
+  };
+  return config[type] || { label: type, className: '' };
+};
 
-const STATUS_OPTIONS: { value: InventoryStatus; label: string }[] = [
-  { value: 'in-stock', label: 'In Stock' },
-  { value: 'in-use', label: 'In Use' },
-  { value: 'maintenance', label: 'Maintenance' }
-];
+const formatCurrency = (value: number) => {
+  return new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency: 'VND'
+  }).format(value);
+};
+
+const formatDate = (dateStr: string | null): string => {
+  if (!dateStr) return '-';
+  return new Date(dateStr).toLocaleDateString('vi-VN');
+};
+
+const isMaintenanceDue = (maintenanceDate: string | null): boolean => {
+  if (!maintenanceDate) return false;
+  const today = new Date();
+  const mDate = new Date(maintenanceDate);
+  return mDate <= today;
+};
+
+const isMaintenanceSoon = (maintenanceDate: string | null): boolean => {
+  if (!maintenanceDate) return false;
+  const today = new Date();
+  const mDate = new Date(maintenanceDate);
+  const diffDays = Math.ceil((mDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  return diffDays > 0 && diffDays <= 7;
+};
 
 function Inventory() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<InventoryCategory | 'all'>('all');
+  const { showToast } = useToast();
   
+  // Data state
+  const [devices, setDevices] = useState<ApiWorkoutDevice[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Filter state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'name'>('newest');
+  
+  // Modal state
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
-  
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedDevice, setSelectedDevice] = useState<ApiWorkoutDevice | null>(null);
+
+  // Form state
   const [formData, setFormData] = useState({
     name: '',
-    description: '',
-    category: '' as InventoryCategory | '',
-      status: 'in-stock' as InventoryStatus,
-    purchaseDate: '',
-    purchasePrice: 0,
-    currentValue: 0,
-    location: '',
+    type: '',
     quantity: 1,
-    maintenanceNotes: '',
-    image: ''
+    price: 0,
+    description: '',
+    dateImported: '',
+    dateMaintenance: '',
+    imageUrl: ''
   });
 
+  // Fetch devices on mount
+  useEffect(() => {
+    fetchDevices();
+  }, []);
+
+  const fetchDevices = async () => {
+    setIsLoading(true);
+    try {
+      const response = await workoutDeviceApi.getAll();
+      setDevices(response.data);
+    } catch (error) {
+      console.error('Failed to fetch devices:', error);
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: 'Không thể tải danh sách thiết bị'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Filter and sort devices
+  const getFilteredDevices = () => {
+    let filtered = [...devices];
+
+    // Apply search filter
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(d => 
+        d.name.toLowerCase().includes(term) ||
+        d.type.toLowerCase().includes(term) ||
+        d.id.toString().includes(term)
+      );
+    }
+
+    // Apply type filter
+    if (typeFilter !== 'all') {
+      filtered = filtered.filter(d => d.type === typeFilter);
+    }
+
+    // Sort
+    filtered.sort((a, b) => {
+      if (sortBy === 'name') {
+        return a.name.localeCompare(b.name);
+      }
+      const dateA = new Date(a.createdAt).getTime();
+      const dateB = new Date(b.createdAt).getTime();
+      return sortBy === 'newest' ? dateB - dateA : dateA - dateB;
+    });
+
+    return filtered;
+  };
+
+  const filteredDevices = getFilteredDevices();
+
+  // Stats
   const stats = {
-    totalItems: mockInventory.reduce((sum, item) => sum + item.quantity, 0),
-    totalValue: mockInventory.reduce((sum, item) => sum + (item.currentValue * item.quantity), 0),
-    inUse: mockInventory.filter(i => i.status === 'in-use').reduce((sum, item) => sum + item.quantity, 0),
-    maintenance: mockInventory.filter(i => i.status === 'maintenance').length
+    totalValue: devices.reduce((sum, d) => sum + d.price, 0),
+    totalDevices: devices.length,
+    maintenanceDue: devices.filter(d => isMaintenanceDue(d.dateMaintenance)).length,
+    maintenanceSoon: devices.filter(d => isMaintenanceSoon(d.dateMaintenance)).length
   };
 
-  const filteredInventory = mockInventory.filter(item => {
-    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          item.id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter;
-    return matchesSearch && matchesCategory;
-  });
-
-  const handleAdd = () => {
-    console.log('Adding item:', formData);
-    setShowAddModal(false);
-    resetForm();
+  const handleView = (device: ApiWorkoutDevice) => {
+    setSelectedDevice(device);
+    setShowViewModal(true);
   };
 
-  const handleUpdate = () => {
-    console.log('Updating item:', formData);
-    setShowEditModal(false);
-    resetForm();
-  };
-
-  const handleEdit = (item: InventoryItem) => {
-    setSelectedItem(item);
+  const handleEdit = (device: ApiWorkoutDevice) => {
+    setSelectedDevice(device);
     setFormData({
-      name: item.name,
-      description: item.description,
-      category: item.category,
-      status: item.status,
-      purchaseDate: item.purchaseDate,
-      purchasePrice: item.purchasePrice,
-      currentValue: item.currentValue,
-      location: item.location,
-      quantity: item.quantity,
-      maintenanceNotes: item.maintenanceNotes || '',
-      image: item.image || ''
+      name: device.name,
+      type: device.type,
+      quantity: 1, // Not used by API but kept for form state
+      price: device.price || 0,
+      description: '', // Not in API
+      dateImported: device.dateImported,
+      dateMaintenance: device.dateMaintenance || '',
+      imageUrl: device.imageUrl || ''
     });
     setShowEditModal(true);
   };
 
-  const handleDelete = (item: InventoryItem) => {
-    if (confirm(`Delete "${item.name}"?`)) {
-      console.log('Deleting item:', item.id);
+  const handleDeleteClick = (device: ApiWorkoutDevice) => {
+    setSelectedDevice(device);
+    setShowDeleteModal(true);
+  };
+
+  const handleAddDevice = async () => {
+    if (!formData.name || !formData.type || formData.quantity <= 0 || !formData.dateImported) {
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: 'Vui lòng điền đầy đủ thông tin bắt buộc'
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const requestData: ReqCreateWorkoutDeviceDTO = {
+        name: formData.name,
+        type: formData.type,
+        price: formData.price || 0,
+        dateImported: formData.dateImported,
+        dateMaintenance: formData.dateMaintenance || undefined,
+        imageUrl: formData.imageUrl || undefined
+      };
+
+      await workoutDeviceApi.create(requestData);
+      
+      showToast({
+        type: 'success',
+        title: 'Thành công',
+        message: 'Đã thêm thiết bị mới'
+      });
+
+      setShowAddModal(false);
+      resetForm();
+      fetchDevices();
+    } catch (error: unknown) {
+      console.error('Failed to create device:', error);
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: axiosError.response?.data?.message || 'Không thể thêm thiết bị'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUpdateDevice = async () => {
+    if (!selectedDevice) return;
+
+    setIsSubmitting(true);
+    try {
+      const requestData: ReqUpdateWorkoutDeviceDTO = {
+        name: formData.name,
+        type: formData.type,
+        price: formData.price || undefined,
+        dateMaintenance: formData.dateMaintenance || undefined,
+        imageUrl: formData.imageUrl || undefined
+      };
+
+      await workoutDeviceApi.update(selectedDevice.id, requestData);
+      
+      showToast({
+        type: 'success',
+        title: 'Thành công',
+        message: 'Đã cập nhật thiết bị'
+      });
+
+      setShowEditModal(false);
+      resetForm();
+      fetchDevices();
+    } catch (error: unknown) {
+      console.error('Failed to update device:', error);
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: axiosError.response?.data?.message || 'Không thể cập nhật thiết bị'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteDevice = async () => {
+    if (!selectedDevice) return;
+
+    setIsSubmitting(true);
+    try {
+      await workoutDeviceApi.delete(selectedDevice.id);
+      
+      showToast({
+        type: 'success',
+        title: 'Thành công',
+        message: `Đã xóa thiết bị "${selectedDevice.name}"`
+      });
+
+      setShowDeleteModal(false);
+      setSelectedDevice(null);
+      fetchDevices();
+    } catch (error: unknown) {
+      console.error('Failed to delete device:', error);
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: axiosError.response?.data?.message || 'Không thể xóa thiết bị'
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const resetForm = () => {
     setFormData({
       name: '',
-      description: '',
-      category: '',
-      status: 'in-stock',
-      purchaseDate: '',
-      purchasePrice: 0,
-      currentValue: 0,
-      location: '',
+      type: '',
       quantity: 1,
-      maintenanceNotes: '',
-      image: ''
+      price: 0,
+      description: '',
+      dateImported: '',
+      dateMaintenance: '',
+      imageUrl: ''
     });
-    setSelectedItem(null);
-  };
-
-  const getStatusConfig = (status: InventoryStatus) => {
-    const config: Record<InventoryStatus, { className: string; label: string }> = {
-      'in-stock': { className: 'inventory__status--in-stock', label: 'In Stock' },
-      'in-use': { className: 'inventory__status--in-use', label: 'In Use' },
-      'maintenance': { className: 'inventory__status--maintenance', label: 'Maintenance' }
-    };
-    return config[status];
-  };
-
-  const getCategoryLabel = (category: InventoryCategory) => {
-    const labels: Record<InventoryCategory, string> = {
-      'cardio': 'Cardio',
-      'free-weights': 'Free Weights',
-      'strength': 'Strength',
-      'accessories': 'Accessories'
-    };
-    return labels[category];
+    setSelectedDevice(null);
   };
 
   const renderFooter = (onCancel: () => void, onSubmit: () => void, submitLabel: string) => (
     <>
-      <button className="modal-form__btn modal-form__btn--secondary" onClick={onCancel}>
+      <button 
+        className="modal-form__btn modal-form__btn--secondary" 
+        onClick={onCancel}
+        disabled={isSubmitting}
+      >
         Cancel
       </button>
-      <button className="modal-form__btn modal-form__btn--primary" onClick={onSubmit}>
-        {submitLabel}
+      <button 
+        className="modal-form__btn modal-form__btn--primary" 
+        onClick={onSubmit}
+        disabled={isSubmitting}
+      >
+        {isSubmitting ? 'Processing...' : submitLabel}
       </button>
     </>
   );
@@ -199,30 +328,40 @@ function Inventory() {
       <div className="inventory__header">
         <div>
           <h1 className="inventory__title">Inventory</h1>
-          <p className="inventory__subtitle">Manage gym equipment and supplies</p>
+          <p className="inventory__subtitle">Manage gym equipment and devices</p>
         </div>
-        <button className="inventory__add-btn" onClick={() => setShowAddModal(true)}>
-          + Add Equipment
-        </button>
+        <div className="inventory__header-actions">
+          <button 
+            className="inventory__refresh-btn" 
+            onClick={fetchDevices}
+            disabled={isLoading}
+            title="Refresh"
+          >
+            <RefreshCw size={18} className={isLoading ? 'spinning' : ''} />
+          </button>
+          <button className="inventory__add-btn" onClick={() => setShowAddModal(true)}>
+            + Add Equipment
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
       <div className="inventory__stats">
         <div className="inventory__stat">
-          <span className="inventory__stat-label">Total Items</span>
-          <span className="inventory__stat-value">{stats.totalItems}</span>
-        </div>
-        <div className="inventory__stat">
           <span className="inventory__stat-label">Total Value</span>
-          <span className="inventory__stat-value inventory__stat-value--green">${stats.totalValue.toLocaleString()}</span>
+          <span className="inventory__stat-value">{formatCurrency(stats.totalValue)}</span>
         </div>
         <div className="inventory__stat">
-          <span className="inventory__stat-label">In Use</span>
-          <span className="inventory__stat-value">{stats.inUse}</span>
+          <span className="inventory__stat-label">Device Types</span>
+          <span className="inventory__stat-value">{stats.totalDevices}</span>
         </div>
         <div className="inventory__stat">
-          <span className="inventory__stat-label">In Maintenance</span>
-          <span className="inventory__stat-value inventory__stat-value--yellow">{stats.maintenance}</span>
+          <span className="inventory__stat-label">Maintenance Due</span>
+          <span className="inventory__stat-value inventory__stat-value--red">{stats.maintenanceDue}</span>
+        </div>
+        <div className="inventory__stat">
+          <span className="inventory__stat-label">Due Soon (7 days)</span>
+          <span className="inventory__stat-value inventory__stat-value--yellow">{stats.maintenanceSoon}</span>
         </div>
       </div>
 
@@ -232,88 +371,114 @@ function Inventory() {
           <Search size={18} />
           <input
             type="text"
-            placeholder="Search equipment..."
+            placeholder="Search equipment by name or ID..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <select
-          className="inventory__filter-select"
-          value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value as InventoryCategory | 'all')}
-        >
-          {CATEGORIES.map(cat => (
-            <option key={cat.value} value={cat.value}>{cat.label}</option>
-          ))}
-        </select>
+        <div className="inventory__filter-group">
+          <div className="inventory__select-wrapper">
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+            >
+              <option value="all">All Types</option>
+              {TYPE_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <ChevronDown size={16} />
+          </div>
+          <div className="inventory__select-wrapper">
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest' | 'name')}>
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
+              <option value="name">Name A-Z</option>
+            </select>
+            <ChevronDown size={16} />
+          </div>
+        </div>
       </div>
 
-      {/* Inventory Grid */}
-      <div className="inventory__grid">
-        {filteredInventory.map((item) => {
-          const statusConfig = getStatusConfig(item.status);
-          return (
-            <div key={item.id} className="inventory__card">
-              <div className="inventory__card-image">
-                <img src={item.image || '/images/placeholder.jpg'} alt={item.name} />
-                <span className={`inventory__status ${statusConfig.className}`}>
-                  {statusConfig.label}
-                </span>
+      {/* Loading State */}
+      {isLoading ? (
+        <div className="inventory__loading">
+          <RefreshCw size={32} className="spinning" />
+          <p>Loading equipment...</p>
+        </div>
+      ) : filteredDevices.length === 0 ? (
+        <div className="inventory__empty">
+          <Package size={48} />
+          <h3>No equipment found</h3>
+          <p>Try adjusting your filters or add new equipment.</p>
+        </div>
+      ) : (
+        /* Inventory Grid */
+        <div className="inventory__grid">
+          {filteredDevices.map((device) => {
+            const typeBadge = getTypeBadge(device.type);
+            const maintenanceDue = isMaintenanceDue(device.dateMaintenance);
+            const maintenanceSoon = isMaintenanceSoon(device.dateMaintenance);
+            
+            return (
+              <div key={device.id} className={`inventory__card ${maintenanceDue ? 'inventory__card--maintenance-due' : ''}`}>
+                <div className="inventory__card-image">
+                  <img 
+                    src={device.imageUrl || '/images/placeholder.jpg'} 
+                    alt={device.name}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = '/images/placeholder.jpg';
+                    }}
+                  />
+                  <span className={`inventory__type-badge ${typeBadge.className}`}>
+                    {typeBadge.label}
+                  </span>
+                </div>
+                
+                <div className="inventory__card-body">
+                  <div className="inventory__card-header">
+                    <div>
+                      <h3 className="inventory__card-name">{device.name}</h3>
+                      <p className="inventory__card-id">ID: #{device.id}</p>
+                    </div>
+                    <div className="inventory__card-actions">
+                      <button onClick={() => handleView(device)} title="View Details">
+                        <Eye size={16} />
+                      </button>
+                      <button onClick={() => handleEdit(device)} title="Edit">
+                        <Pencil size={16} />
+                      </button>
+                      <button className="inventory__card-action--delete" onClick={() => handleDeleteClick(device)} title="Delete">
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <p className="inventory__card-desc">{formatCurrency(device.price)}</p>
+
+                  <div className="inventory__card-info">
+                    <div className="inventory__card-info-item">
+                      <Calendar size={14} />
+                      <span>Import: {formatDate(device.dateImported)}</span>
+                    </div>
+                  </div>
+
+                  {device.dateMaintenance && (
+                    <div className={`inventory__card-maintenance ${maintenanceDue ? 'inventory__card-maintenance--due' : maintenanceSoon ? 'inventory__card-maintenance--soon' : ''}`}>
+                      <Wrench size={14} />
+                      <span>
+                        Maintenance: {formatDate(device.dateMaintenance)}
+                        {maintenanceDue && ' (OVERDUE)'}
+                        {maintenanceSoon && ' (Soon)'}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
-              
-              <div className="inventory__card-body">
-                <div className="inventory__card-header">
-                  <div>
-                    <h3 className="inventory__card-name">{item.name}</h3>
-                    <p className="inventory__card-id">{item.id}</p>
-                  </div>
-                  <div className="inventory__card-actions">
-                    <button onClick={() => handleEdit(item)}><Pencil size={16} /></button>
-                    <button className="inventory__card-action--delete" onClick={() => handleDelete(item)}>
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </div>
-
-                <p className="inventory__card-desc">{item.description}</p>
-
-                <div className="inventory__card-category">
-                  <Package size={14} />
-                  <span>{getCategoryLabel(item.category)}</span>
-                </div>
-
-                <div className="inventory__card-details">
-                  <div className="inventory__card-detail">
-                    <span className="inventory__card-detail-label">Location</span>
-                    <span className="inventory__card-detail-value">{item.location}</span>
-                  </div>
-                  <div className="inventory__card-detail">
-                    <span className="inventory__card-detail-label">Quantity</span>
-                    <span className="inventory__card-detail-value">{item.quantity}</span>
-                  </div>
-                </div>
-
-                <div className="inventory__card-pricing">
-                  <div className="inventory__card-price">
-                    <span className="inventory__card-price-label">Purchase</span>
-                    <span className="inventory__card-price-value">${item.purchasePrice}</span>
-                  </div>
-                  <div className="inventory__card-price">
-                    <span className="inventory__card-price-label">Current Value</span>
-                    <span className="inventory__card-price-value">${item.currentValue}</span>
-                  </div>
-                </div>
-
-                {item.status === 'maintenance' && item.maintenanceNotes && (
-                  <div className="inventory__card-maintenance">
-                    <span>⚠️ {item.maintenanceNotes}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Add Modal */}
       <Modal
@@ -323,146 +488,79 @@ function Inventory() {
         size="md"
         footer={renderFooter(
           () => { setShowAddModal(false); resetForm(); },
-          handleAdd,
+          handleAddDevice,
           'Add Equipment'
         )}
       >
         <div className="modal-form">
           <div className="modal-form__group">
-            <label className="modal-form__label">Equipment Photo</label>
-            <div className="inventory__photo-upload">
-              <div className="inventory__photo-preview">
-                <img src="/images/placeholder.jpg" alt="Preview" />
-              </div>
-              <div className="inventory__photo-dropzone">
-                <Upload size={24} />
-                <span>Click to upload or drag and drop</span>
-                <span className="inventory__photo-hint">PNG, JPG, JPEG up to 5MB</span>
-              </div>
-            </div>
-          </div>
-
-          <h3 className="inventory__form-section">Basic Information</h3>
-
-          <div className="modal-form__row">
-            <div className="modal-form__group">
-              <label className="modal-form__label modal-form__label--required">Equipment Name</label>
-              <input
-                type="text"
-                className="modal-form__input"
-                placeholder="e.g., Treadmill Pro X500"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              />
-            </div>
-            <div className="modal-form__group">
-              <label className="modal-form__label modal-form__label--required">Category</label>
-              <select
-                className="modal-form__select"
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value as InventoryCategory })}
-              >
-                <option value="">Select category</option>
-                {CATEGORIES.filter(c => c.value !== 'all').map(cat => (
-                  <option key={cat.value} value={cat.value}>{cat.label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="modal-form__group">
-            <label className="modal-form__label">Description</label>
-            <textarea
-              className="modal-form__textarea"
-              placeholder="Brief description of the equipment..."
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            <label className="modal-form__label modal-form__label--required">Equipment Name</label>
+            <input
+              type="text"
+              className="modal-form__input"
+              placeholder="e.g., Treadmill Pro X500"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             />
           </div>
 
-          <h3 className="inventory__form-section">Details</h3>
-
           <div className="modal-form__row">
             <div className="modal-form__group">
-              <label className="modal-form__label modal-form__label--required">Quantity</label>
-              <input
-                type="number"
-                className="modal-form__input"
-                min={1}
-                value={formData.quantity}
-                onChange={(e) => setFormData({ ...formData, quantity: Number(e.target.value) })}
-              />
-            </div>
-            <div className="modal-form__group">
-              <label className="modal-form__label modal-form__label--required">Location</label>
-              <input
-                type="text"
-                className="modal-form__input"
-                placeholder="e.g., Main Floor - Zone A"
-                value={formData.location}
-                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-              />
-            </div>
-          </div>
-
-          <h3 className="inventory__form-section">Pricing & Status</h3>
-
-          <div className="modal-form__row">
-            <div className="modal-form__group">
-              <label className="modal-form__label modal-form__label--required">Purchase Price ($)</label>
-              <input
-                type="number"
-                className="modal-form__input"
-                value={formData.purchasePrice || ''}
-                onChange={(e) => setFormData({ ...formData, purchasePrice: Number(e.target.value) })}
-              />
-            </div>
-            <div className="modal-form__group">
-              <label className="modal-form__label">Current Value ($)</label>
-              <input
-                type="number"
-                className="modal-form__input"
-                value={formData.currentValue || ''}
-                onChange={(e) => setFormData({ ...formData, currentValue: Number(e.target.value) })}
-              />
-            </div>
-          </div>
-
-          <div className="modal-form__row">
-            <div className="modal-form__group">
-              <label className="modal-form__label">Purchase Date</label>
-              <input
-                type="date"
-                className="modal-form__input"
-                value={formData.purchaseDate}
-                onChange={(e) => setFormData({ ...formData, purchaseDate: e.target.value })}
-              />
-            </div>
-            <div className="modal-form__group">
-              <label className="modal-form__label">Status</label>
+              <label className="modal-form__label modal-form__label--required">Type</label>
               <select
                 className="modal-form__select"
-                value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value as InventoryStatus })}
+                value={formData.type}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
               >
-                {STATUS_OPTIONS.map(opt => (
+                <option value="">Select Type</option>
+                {TYPE_OPTIONS.map(opt => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
             </div>
-          </div>
-
-          {formData.status === 'maintenance' && (
             <div className="modal-form__group">
-              <label className="modal-form__label">Maintenance Notes</label>
-              <textarea
-                className="modal-form__textarea"
-                placeholder="Describe the maintenance issue..."
-                value={formData.maintenanceNotes}
-                onChange={(e) => setFormData({ ...formData, maintenanceNotes: e.target.value })}
+              <label className="modal-form__label modal-form__label--required">Price (VND)</label>
+              <input
+                type="number"
+                className="modal-form__input"
+                min={0}
+                value={formData.price || ''}
+                onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
               />
             </div>
-          )}
+          </div>
+
+          <div className="modal-form__row">
+            <div className="modal-form__group">
+              <label className="modal-form__label modal-form__label--required">Import Date</label>
+              <input
+                type="date"
+                className="modal-form__input"
+                value={formData.dateImported}
+                onChange={(e) => setFormData({ ...formData, dateImported: e.target.value })}
+              />
+            </div>
+            <div className="modal-form__group">
+              <label className="modal-form__label">Maintenance Date</label>
+              <input
+                type="date"
+                className="modal-form__input"
+                value={formData.dateMaintenance}
+                onChange={(e) => setFormData({ ...formData, dateMaintenance: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="modal-form__group">
+            <label className="modal-form__label">Image URL</label>
+            <input
+              type="text"
+              className="modal-form__input"
+              placeholder="https://example.com/image.jpg"
+              value={formData.imageUrl}
+              onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+            />
+          </div>
         </div>
       </Modal>
 
@@ -474,143 +572,150 @@ function Inventory() {
         size="md"
         footer={renderFooter(
           () => { setShowEditModal(false); resetForm(); },
-          handleUpdate,
+          handleUpdateDevice,
           'Update Equipment'
         )}
       >
         <div className="modal-form">
           <div className="modal-form__group">
-            <label className="modal-form__label">Equipment Photo</label>
-            <div className="inventory__photo-upload">
-              <div className="inventory__photo-preview inventory__photo-preview--has-image">
-                <img src={selectedItem?.image || '/images/placeholder.jpg'} alt="Preview" />
-                {selectedItem?.image && (
-                  <button className="inventory__photo-remove"><X size={12} /></button>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <h3 className="inventory__form-section">Basic Information</h3>
-
-          <div className="modal-form__row">
-            <div className="modal-form__group">
-              <label className="modal-form__label modal-form__label--required">Equipment Name</label>
-              <input
-                type="text"
-                className="modal-form__input"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              />
-            </div>
-            <div className="modal-form__group">
-              <label className="modal-form__label modal-form__label--required">Category</label>
-              <select
-                className="modal-form__select"
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value as InventoryCategory })}
-              >
-                <option value="">Select category</option>
-                {CATEGORIES.filter(c => c.value !== 'all').map(cat => (
-                  <option key={cat.value} value={cat.value}>{cat.label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="modal-form__group">
-            <label className="modal-form__label">Description</label>
-            <textarea
-              className="modal-form__textarea"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            <label className="modal-form__label modal-form__label--required">Equipment Name</label>
+            <input
+              type="text"
+              className="modal-form__input"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             />
           </div>
 
-          <h3 className="inventory__form-section">Details</h3>
-
           <div className="modal-form__row">
             <div className="modal-form__group">
-              <label className="modal-form__label modal-form__label--required">Quantity</label>
-              <input
-                type="number"
-                className="modal-form__input"
-                min={1}
-                value={formData.quantity}
-                onChange={(e) => setFormData({ ...formData, quantity: Number(e.target.value) })}
-              />
-            </div>
-            <div className="modal-form__group">
-              <label className="modal-form__label modal-form__label--required">Location</label>
-              <input
-                type="text"
-                className="modal-form__input"
-                value={formData.location}
-                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-              />
-            </div>
-          </div>
-
-          <h3 className="inventory__form-section">Pricing & Status</h3>
-
-          <div className="modal-form__row">
-            <div className="modal-form__group">
-              <label className="modal-form__label modal-form__label--required">Purchase Price ($)</label>
-              <input
-                type="number"
-                className="modal-form__input"
-                value={formData.purchasePrice || ''}
-                onChange={(e) => setFormData({ ...formData, purchasePrice: Number(e.target.value) })}
-              />
-            </div>
-            <div className="modal-form__group">
-              <label className="modal-form__label">Current Value ($)</label>
-              <input
-                type="number"
-                className="modal-form__input"
-                value={formData.currentValue || ''}
-                onChange={(e) => setFormData({ ...formData, currentValue: Number(e.target.value) })}
-              />
-            </div>
-          </div>
-
-          <div className="modal-form__row">
-            <div className="modal-form__group">
-              <label className="modal-form__label">Purchase Date</label>
-              <input
-                type="date"
-                className="modal-form__input"
-                value={formData.purchaseDate}
-                onChange={(e) => setFormData({ ...formData, purchaseDate: e.target.value })}
-              />
-            </div>
-            <div className="modal-form__group">
-              <label className="modal-form__label">Status</label>
+              <label className="modal-form__label modal-form__label--required">Type</label>
               <select
                 className="modal-form__select"
-                value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value as InventoryStatus })}
+                value={formData.type}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
               >
-                {STATUS_OPTIONS.map(opt => (
+                <option value="">Select Type</option>
+                {TYPE_OPTIONS.map(opt => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
             </div>
-          </div>
-
-          {formData.status === 'maintenance' && (
             <div className="modal-form__group">
-              <label className="modal-form__label">Maintenance Notes</label>
-              <textarea
-                className="modal-form__textarea"
-                placeholder="Describe the maintenance issue..."
-                value={formData.maintenanceNotes}
-                onChange={(e) => setFormData({ ...formData, maintenanceNotes: e.target.value })}
+              <label className="modal-form__label modal-form__label--required">Price (VND)</label>
+              <input
+                type="number"
+                className="modal-form__input"
+                min={0}
+                value={formData.price || ''}
+                onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
               />
             </div>
-          )}
+          </div>
+
+          <div className="modal-form__row">
+            <div className="modal-form__group">
+              <label className="modal-form__label">Import Date</label>
+              <input
+                type="date"
+                className="modal-form__input"
+                value={formData.dateImported}
+                onChange={(e) => setFormData({ ...formData, dateImported: e.target.value })}
+                disabled
+              />
+            </div>
+            <div className="modal-form__group">
+              <label className="modal-form__label">Maintenance Date</label>
+              <input
+                type="date"
+                className="modal-form__input"
+                value={formData.dateMaintenance}
+                onChange={(e) => setFormData({ ...formData, dateMaintenance: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="modal-form__group">
+            <label className="modal-form__label">Image URL</label>
+            <input
+              type="text"
+              className="modal-form__input"
+              value={formData.imageUrl}
+              onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+            />
+          </div>
         </div>
       </Modal>
+
+      {/* View Modal */}
+      <Modal
+        isOpen={showViewModal}
+        onClose={() => { setShowViewModal(false); setSelectedDevice(null); }}
+        title="Equipment Details"
+        size="md"
+      >
+        {selectedDevice && (
+          <div className="inventory__view-modal">
+            <div className="inventory__view-image">
+              <img 
+                src={selectedDevice.imageUrl || '/images/placeholder.jpg'} 
+                alt={selectedDevice.name}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = '/images/placeholder.jpg';
+                }}
+              />
+            </div>
+
+            <div className="inventory__view-header">
+              <h3>{selectedDevice.name}</h3>
+              <span className={`inventory__type-badge ${getTypeBadge(selectedDevice.type).className}`}>
+                {getTypeBadge(selectedDevice.type).label}
+              </span>
+            </div>
+
+            <div className="inventory__view-grid">
+              <div className="inventory__view-item">
+                <span className="inventory__view-label">ID</span>
+                <span className="inventory__view-value">#{selectedDevice.id}</span>
+              </div>
+              <div className="inventory__view-item">
+                <span className="inventory__view-label">Price</span>
+                <span className="inventory__view-value">{formatCurrency(selectedDevice.price)}</span>
+              </div>
+              <div className="inventory__view-item">
+                <span className="inventory__view-label">Import Date</span>
+                <span className="inventory__view-value">{formatDate(selectedDevice.dateImported)}</span>
+              </div>
+              <div className="inventory__view-item">
+                <span className="inventory__view-label">Maintenance Date</span>
+                <span className={`inventory__view-value ${isMaintenanceDue(selectedDevice.dateMaintenance) ? 'inventory__view-value--red' : ''}`}>
+                  {formatDate(selectedDevice.dateMaintenance)}
+                  {isMaintenanceDue(selectedDevice.dateMaintenance) && ' (OVERDUE)'}
+                </span>
+              </div>
+              <div className="inventory__view-item">
+                <span className="inventory__view-label">Created At</span>
+                <span className="inventory__view-value">
+                  {new Date(selectedDevice.createdAt).toLocaleString('vi-VN')}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => { setShowDeleteModal(false); setSelectedDevice(null); }}
+        onConfirm={handleDeleteDevice}
+        title="Delete Equipment"
+        message={`Are you sure you want to delete "${selectedDevice?.name}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={isSubmitting}
+      />
     </div>
   );
 }

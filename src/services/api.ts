@@ -32,6 +32,36 @@ import type {
   ApiDietDetail,
   ReqCreateDietDetailDTO,
   ReqUpdateDietDetailDTO,
+  ApiWorkout,
+  ReqCreateWorkoutDTO,
+  ReqUpdateWorkoutDTO,
+  WorkoutDifficultyEnum,
+  WorkoutTypeEnum,
+  ApiWorkoutDevice,
+  ReqCreateWorkoutDeviceDTO,
+  ReqUpdateWorkoutDeviceDTO,
+  ApiContract,
+  ReqCreateContractDTO,
+  ContractStatusEnum,
+  // Auth types
+  ReqLoginDTO,
+  LoginResponse,
+  AccountInfo,
+  RefreshTokenResponse,
+  // Booking types
+  ApiBooking,
+  ReqCreateBookingDTO,
+  ReqUpdateBookingPtDTO,
+  // Available Slot types
+  ApiAvailableSlot,
+  ApiPtAvailableSlot,
+  ReqCreateAvailableSlotDTO,
+  ReqUpdateAvailableSlotDTO,
+  AvailableSlotStatusEnum,
+  // Invoice types
+  ApiInvoice,
+  ReqAddServiceToInvoiceDTO,
+  ReqUpdatePaymentStatusDTO,
 } from '../types/api.ts';
 
 // ===== Axios Instance Configuration =====
@@ -508,6 +538,394 @@ export const dietDetailApi = {
   },
 };
 
+// ===== Workout API =====
+
+export const workoutApi = {
+  // Get all workouts
+  getAll: async (): Promise<ApiResponse<ApiWorkout[]>> => {
+    const response = await apiClient.get<ApiResponse<ApiWorkout[]>>('/api/v1/workouts');
+    return response.data;
+  },
+
+  // Get workout by ID
+  getById: async (id: number): Promise<ApiResponse<ApiWorkout>> => {
+    const response = await apiClient.get<ApiResponse<ApiWorkout>>(`/api/v1/workouts/${id}`);
+    return response.data;
+  },
+
+  // Get workout by exact name
+  getByName: async (name: string): Promise<ApiResponse<ApiWorkout>> => {
+    const response = await apiClient.get<ApiResponse<ApiWorkout>>('/api/v1/workouts/by-name', {
+      params: { name }
+    });
+    return response.data;
+  },
+
+  // Search workouts by name (partial match)
+  search: async (name: string, page: number = 0, size: number = 20): Promise<ApiResponse<ResultPaginationDTO<ApiWorkout>>> => {
+    const response = await apiClient.get<ApiResponse<ResultPaginationDTO<ApiWorkout>>>('/api/v1/workouts/search', {
+      params: { name, page, size }
+    });
+    return response.data;
+  },
+
+  // Get workouts by difficulty
+  getByDifficulty: async (difficulty: WorkoutDifficultyEnum): Promise<ApiResponse<ApiWorkout[]>> => {
+    const response = await apiClient.get<ApiResponse<ApiWorkout[]>>(`/api/v1/workouts/by-difficulty/${difficulty}`);
+    return response.data;
+  },
+
+  // Get workouts by type
+  getByType: async (type: WorkoutTypeEnum): Promise<ApiResponse<ApiWorkout[]>> => {
+    const response = await apiClient.get<ApiResponse<ApiWorkout[]>>(`/api/v1/workouts/by-type/${type}`);
+    return response.data;
+  },
+
+  // Get workouts by duration range
+  getByDurationRange: async (minDuration: number, maxDuration: number, page: number = 0, size: number = 20): Promise<ApiResponse<ResultPaginationDTO<ApiWorkout>>> => {
+    const response = await apiClient.get<ApiResponse<ResultPaginationDTO<ApiWorkout>>>('/api/v1/workouts/by-duration-range', {
+      params: { minDuration, maxDuration, page, size }
+    });
+    return response.data;
+  },
+
+  // Create workout
+  create: async (data: ReqCreateWorkoutDTO): Promise<ApiResponse<ApiWorkout>> => {
+    const response = await apiClient.post<ApiResponse<ApiWorkout>>('/api/v1/workouts', data);
+    return response.data;
+  },
+
+  // Update workout
+  update: async (id: number, data: ReqUpdateWorkoutDTO): Promise<ApiResponse<ApiWorkout>> => {
+    const response = await apiClient.put<ApiResponse<ApiWorkout>>(`/api/v1/workouts/${id}`, data);
+    return response.data;
+  },
+
+  // Delete workout
+  delete: async (id: number): Promise<ApiResponse<null>> => {
+    const response = await apiClient.delete<ApiResponse<null>>(`/api/v1/workouts/${id}`);
+    return response.data;
+  },
+};
+
+// ===== Workout Device API =====
+
+export const workoutDeviceApi = {
+  // Get all workout devices
+  getAll: async (): Promise<ApiResponse<ApiWorkoutDevice[]>> => {
+    const response = await apiClient.get<ApiResponse<ApiWorkoutDevice[]>>('/api/v1/workout-devices');
+    return response.data;
+  },
+
+  // Get device by ID
+  getById: async (id: number): Promise<ApiResponse<ApiWorkoutDevice>> => {
+    const response = await apiClient.get<ApiResponse<ApiWorkoutDevice>>(`/api/v1/workout-devices/${id}`);
+    return response.data;
+  },
+
+  // Search by name
+  searchByName: async (name: string): Promise<ApiResponse<ApiWorkoutDevice[]>> => {
+    const response = await apiClient.get<ApiResponse<ApiWorkoutDevice[]>>('/api/v1/workout-devices/by-name', {
+      params: { name }
+    });
+    return response.data;
+  },
+
+  // Get devices by type (Cardio, Strength, Free Weights, Functional)
+  getByType: async (type: string, page: number = 0, size: number = 20): Promise<ApiResponse<ResultPaginationDTO<ApiWorkoutDevice>>> => {
+    const response = await apiClient.get<ApiResponse<ResultPaginationDTO<ApiWorkoutDevice>>>('/api/v1/workout-devices/by-type', {
+      params: { type, page, size }
+    });
+    return response.data;
+  },
+
+  // Get devices requiring maintenance
+  getMaintenanceRequired: async (beforeDate: string, page: number = 0, size: number = 20): Promise<ApiResponse<ResultPaginationDTO<ApiWorkoutDevice>>> => {
+    const response = await apiClient.get<ApiResponse<ResultPaginationDTO<ApiWorkoutDevice>>>('/api/v1/workout-devices/maintenance-required', {
+      params: { beforeDate, page, size }
+    });
+    return response.data;
+  },
+
+  // Get devices imported after date
+  getImportedAfter: async (afterDate: string, page: number = 0, size: number = 20): Promise<ApiResponse<ResultPaginationDTO<ApiWorkoutDevice>>> => {
+    const response = await apiClient.get<ApiResponse<ResultPaginationDTO<ApiWorkoutDevice>>>('/api/v1/workout-devices/imported-after', {
+      params: { afterDate, page, size }
+    });
+    return response.data;
+  },
+
+  // Count devices by type
+  countByType: async (type: string): Promise<ApiResponse<number>> => {
+    const response = await apiClient.get<ApiResponse<number>>('/api/v1/workout-devices/count-by-type', {
+      params: { type }
+    });
+    return response.data;
+  },
+
+  // Create workout device
+  create: async (data: ReqCreateWorkoutDeviceDTO): Promise<ApiResponse<ApiWorkoutDevice>> => {
+    const response = await apiClient.post<ApiResponse<ApiWorkoutDevice>>('/api/v1/workout-devices', data);
+    return response.data;
+  },
+
+  // Update workout device
+  update: async (id: number, data: ReqUpdateWorkoutDeviceDTO): Promise<ApiResponse<ApiWorkoutDevice>> => {
+    const response = await apiClient.put<ApiResponse<ApiWorkoutDevice>>(`/api/v1/workout-devices/${id}`, data);
+    return response.data;
+  },
+
+  // Delete workout device
+  delete: async (id: number): Promise<ApiResponse<null>> => {
+    const response = await apiClient.delete<ApiResponse<null>>(`/api/v1/workout-devices/${id}`);
+    return response.data;
+  },
+};
+
+// ===== Contract API =====
+
+export const contractApi = {
+  // Get all contracts
+  getAll: async (): Promise<ApiResponse<ApiContract[]>> => {
+    const response = await apiClient.get<ApiResponse<{ data: ApiContract[] }>>('/api/v1/contracts');
+    // Handle nested data structure
+    return {
+      ...response.data,
+      data: response.data.data?.data || response.data.data || []
+    } as ApiResponse<ApiContract[]>;
+  },
+
+  // Get contracts by status
+  getByStatus: async (status: ContractStatusEnum): Promise<ApiResponse<ApiContract[]>> => {
+    const response = await apiClient.get<ApiResponse<{ data: ApiContract[] }>>(`/api/v1/contracts/status/${status}`);
+    return {
+      ...response.data,
+      data: response.data.data?.data || response.data.data || []
+    } as ApiResponse<ApiContract[]>;
+  },
+
+  // Get contract by ID
+  getById: async (id: number): Promise<ApiResponse<ApiContract>> => {
+    const response = await apiClient.get<ApiResponse<{ data: ApiContract }>>(`/api/v1/contracts/id/${id}`);
+    return {
+      ...response.data,
+      data: response.data.data?.data || response.data.data
+    } as ApiResponse<ApiContract>;
+  },
+
+  // Get contracts by member ID
+  getByMemberId: async (memberId: number): Promise<ApiResponse<ApiContract[]>> => {
+    const response = await apiClient.get<ApiResponse<{ data: ApiContract[] }>>(`/api/v1/contracts/member/${memberId}`);
+    return {
+      ...response.data,
+      data: response.data.data?.data || response.data.data || []
+    } as ApiResponse<ApiContract[]>;
+  },
+
+  // Get contracts by PT ID
+  getByPtId: async (ptId: number): Promise<ApiResponse<ApiContract[]>> => {
+    const response = await apiClient.get<ApiResponse<{ data: ApiContract[] }>>(`/api/v1/contracts/pt/${ptId}`);
+    return {
+      ...response.data,
+      data: response.data.data?.data || response.data.data || []
+    } as ApiResponse<ApiContract[]>;
+  },
+
+  // Create contract
+  create: async (data: ReqCreateContractDTO): Promise<ApiResponse<ApiContract>> => {
+    const response = await apiClient.post<ApiResponse<{ data: ApiContract }>>('/api/v1/contracts', data);
+    return {
+      ...response.data,
+      data: response.data.data?.data || response.data.data
+    } as ApiResponse<ApiContract>;
+  },
+};
+
+// ===== Auth API =====
+
+export const authApi = {
+  // Login
+  login: async (data: ReqLoginDTO): Promise<ApiResponse<LoginResponse>> => {
+    const response = await apiClient.post<ApiResponse<LoginResponse>>('/api/v1/auth/login', data);
+    return response.data;
+  },
+
+  // Get account info
+  getAccount: async (): Promise<ApiResponse<AccountInfo>> => {
+    const response = await apiClient.get<ApiResponse<AccountInfo>>('/api/v1/auth/account');
+    return response.data;
+  },
+
+  // Refresh token
+  refresh: async (): Promise<ApiResponse<RefreshTokenResponse>> => {
+    const response = await apiClient.get<ApiResponse<RefreshTokenResponse>>('/api/v1/auth/refresh');
+    return response.data;
+  },
+
+  // Logout
+  logout: async (): Promise<ApiResponse<null>> => {
+    const response = await apiClient.post<ApiResponse<null>>('/api/v1/auth/logout');
+    return response.data;
+  },
+};
+
+// ===== Booking API =====
+
+export const bookingApi = {
+  // Get all bookings
+  getAll: async (params?: {
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    size?: number;
+  }): Promise<ApiResponse<ApiBooking[]>> => {
+    const response = await apiClient.get<ApiResponse<ApiBooking[]>>('/api/v1/bookings', { params });
+    return response.data;
+  },
+
+  // Get booking by ID
+  getById: async (id: number): Promise<ApiResponse<ApiBooking>> => {
+    const response = await apiClient.get<ApiResponse<ApiBooking>>(`/api/v1/bookings/${id}`);
+    return response.data;
+  },
+
+  // Create booking
+  create: async (data: ReqCreateBookingDTO): Promise<ApiResponse<ApiBooking>> => {
+    const response = await apiClient.post<ApiResponse<ApiBooking>>('/api/v1/bookings', data);
+    return response.data;
+  },
+
+  // Update booking PT
+  updatePt: async (id: number, data: ReqUpdateBookingPtDTO): Promise<ApiResponse<ApiBooking>> => {
+    const response = await apiClient.put<ApiResponse<ApiBooking>>(`/api/v1/bookings/${id}/pt`, data);
+    return response.data;
+  },
+
+  // Delete/cancel booking
+  delete: async (id: number): Promise<ApiResponse<null>> => {
+    const response = await apiClient.delete<ApiResponse<null>>(`/api/v1/bookings/${id}`);
+    return response.data;
+  },
+
+  // Get available slots for booking
+  getAvailableSlots: async (params?: {
+    date?: string;
+    servicePackageId?: number;
+    ptId?: number;
+  }): Promise<ApiResponse<ApiAvailableSlot[]>> => {
+    const response = await apiClient.get<ApiResponse<ApiAvailableSlot[]>>('/api/v1/bookings/available-slots', { params });
+    return response.data;
+  },
+};
+
+// ===== Available Slot API (PT Availability) =====
+
+export const availableSlotApi = {
+  // Get all available slots with pagination
+  getAll: async (params?: {
+    page?: number;
+    size?: number;
+    sort?: string;
+  }): Promise<ApiResponse<ResultPaginationDTO<ApiAvailableSlot>>> => {
+    const response = await apiClient.get<ApiResponse<ResultPaginationDTO<ApiAvailableSlot>>>('/api/v1/available-slots', { params });
+    return response.data;
+  },
+
+  // Fetch with filter
+  fetch: async (params?: {
+    filter?: string;
+    page?: number;
+    size?: number;
+    sort?: string;
+  }): Promise<ApiResponse<ResultPaginationDTO<ApiAvailableSlot>>> => {
+    const response = await apiClient.get<ApiResponse<ResultPaginationDTO<ApiAvailableSlot>>>('/api/v1/available-slots/fetch', { params });
+    return response.data;
+  },
+
+  // Get by ID
+  getById: async (id: number): Promise<ApiResponse<ApiAvailableSlot>> => {
+    const response = await apiClient.get<ApiResponse<ApiAvailableSlot>>(`/api/v1/available-slots/${id}`);
+    return response.data;
+  },
+
+  // Get slots by PT
+  getByPtId: async (ptId: number, params?: {
+    page?: number;
+    size?: number;
+  }): Promise<ApiResponse<ResultPaginationDTO<ApiAvailableSlot>>> => {
+    const response = await apiClient.get<ApiResponse<ResultPaginationDTO<ApiAvailableSlot>>>(`/api/v1/available-slots/by-pt/${ptId}`, { params });
+    return response.data;
+  },
+
+  // Get available (AVAILABLE status only) slots by PT - returns ApiPtAvailableSlot[]
+  getAvailableByPtId: async (ptId: number): Promise<ApiResponse<ApiPtAvailableSlot[]>> => {
+    const response = await apiClient.get<ApiResponse<ApiPtAvailableSlot[]>>(`/api/v1/available-slots/pt/${ptId}/available`);
+    return response.data;
+  },
+
+  // Get slots by status
+  getByStatus: async (status: AvailableSlotStatusEnum, params?: {
+    page?: number;
+    size?: number;
+  }): Promise<ApiResponse<ResultPaginationDTO<ApiAvailableSlot>>> => {
+    const response = await apiClient.get<ApiResponse<ResultPaginationDTO<ApiAvailableSlot>>>(`/api/v1/available-slots/by-status/${status}`, { params });
+    return response.data;
+  },
+
+  // Create available slot
+  create: async (data: ReqCreateAvailableSlotDTO): Promise<ApiResponse<ApiAvailableSlot>> => {
+    const response = await apiClient.post<ApiResponse<ApiAvailableSlot>>('/api/v1/available-slots', data);
+    return response.data;
+  },
+
+  // Update available slot
+  update: async (id: number, data: ReqUpdateAvailableSlotDTO): Promise<ApiResponse<ApiAvailableSlot>> => {
+    const response = await apiClient.put<ApiResponse<ApiAvailableSlot>>(`/api/v1/available-slots/${id}`, data);
+    return response.data;
+  },
+
+  // Delete available slot
+  delete: async (id: number): Promise<ApiResponse<null>> => {
+    const response = await apiClient.delete<ApiResponse<null>>(`/api/v1/available-slots/${id}`);
+    return response.data;
+  },
+};
+
+// ===== Invoice API =====
+
+export const invoiceApi = {
+  // Get invoice by ID
+  getById: async (id: number): Promise<ApiResponse<ApiInvoice>> => {
+    const response = await apiClient.get<ApiResponse<ApiInvoice>>(`/api/v1/invoices/${id}`);
+    return response.data;
+  },
+
+  // Get invoices by member
+  getByMemberId: async (memberId: number, params?: {
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    size?: number;
+  }): Promise<ApiResponse<ApiInvoice[]>> => {
+    const response = await apiClient.get<ApiResponse<ApiInvoice[]>>(`/api/v1/invoices/member/${memberId}`, { params });
+    return response.data;
+  },
+
+  // Add service to invoice
+  addService: async (id: number, data: ReqAddServiceToInvoiceDTO): Promise<ApiResponse<ApiInvoice>> => {
+    const response = await apiClient.put<ApiResponse<ApiInvoice>>(`/api/v1/invoices/${id}/add-service`, data);
+    return response.data;
+  },
+
+  // Update payment status
+  updatePaymentStatus: async (id: number, data: ReqUpdatePaymentStatusDTO): Promise<ApiResponse<ApiInvoice>> => {
+    const response = await apiClient.put<ApiResponse<ApiInvoice>>(`/api/v1/invoices/${id}/payment-status`, data);
+    return response.data;
+  },
+};
+
 export default {
   memberApi,
   ptApi,
@@ -518,4 +936,11 @@ export default {
   foodApi,
   dailyDietApi,
   dietDetailApi,
+  workoutApi,
+  workoutDeviceApi,
+  contractApi,
+  authApi,
+  bookingApi,
+  availableSlotApi,
+  invoiceApi,
 };
