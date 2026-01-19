@@ -67,7 +67,7 @@
 
 - **Node.js:** 18.x hoặc cao hơn
 - **npm:** 9.x hoặc cao hơn
-- **Backend API:** Đảm bảo backend đã chạy tại `http://localhost:8080`
+- **Backend API:** Đảm bảo backend đã chạy tại `http://localhost:8081`
 
 ## 🚀 Hướng dẫn cài đặt và chạy
 
@@ -90,7 +90,7 @@ Kiểm tra file `src/services/api.ts` và đảm bảo `baseURL` trỏ đúng ba
 
 ```typescript
 const api = axios.create({
-  baseURL: 'http://localhost:8080'
+  baseURL: 'http://localhost:8081'
 });
 ```
 
@@ -204,7 +204,11 @@ npm install
 
 ## 📄 License
 
-Private project - All rights reserved
+Made as part of a uni project (class SE100) - All rights reserved
+
+### Author
+
+Tăng Minh Hoàng - 23520540
 
 ---
 
