@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, ChevronDown, Pencil, Trash2, Clock, Dumbbell, RefreshCw, Eye } from 'lucide-react';
+import { Search, ChevronDown, ChevronLeft, ChevronRight, Pencil, Trash2, Clock, Dumbbell, RefreshCw, Eye } from 'lucide-react';
 import Modal from '../../Modal/index.ts';
 import { ConfirmModal, useToast } from '../../../ui/index.ts';
 import { workoutApi } from '../../../../services/index.ts';
@@ -61,6 +61,12 @@ function Workouts({ userRole }: WorkoutsProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const pageSize = 20;
+  
   // Filter state
   const [searchTerm, setSearchTerm] = useState('');
   const [difficultyFilter, setDifficultyFilter] = useState<WorkoutDifficultyEnum | 'all'>('all');
@@ -83,26 +89,40 @@ function Workouts({ userRole }: WorkoutsProps) {
     type: '' as WorkoutTypeEnum | ''
   });
 
-  // Fetch workouts on mount
+  // Fetch workouts on mount and page change
   useEffect(() => {
-    fetchWorkouts();
-  }, []);
+    fetchWorkouts(currentPage);
+  }, [currentPage]);
 
-  const fetchWorkouts = async () => {
+  const fetchWorkouts = async (page: number) => {
     setIsLoading(true);
     try {
-      const response = await workoutApi.getAll();
-      setWorkouts(response.data);
+      const response = await workoutApi.getAll(page, pageSize);
+      // Handle paginated response: data contains { meta, result }
+      const paginatedData = response.data as { meta?: { totalPages: number; totalItems: number }; result?: ApiWorkout[] };
+      setWorkouts(paginatedData.result || []);
+      setTotalPages(paginatedData.meta?.totalPages || 1);
+      setTotalItems(paginatedData.meta?.totalItems || 0);
     } catch (error) {
       console.error('Failed to fetch workouts:', error);
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: 'Không thể tải danh sách bài tập'
+        title: 'Error',
+        message: 'Failed to load workouts list'
       });
+      setWorkouts([]);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Pagination handlers
+  const handlePrevPage = () => {
+    if (currentPage > 1) setCurrentPage(currentPage - 1);
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
   };
 
   // Filter and sort workouts
@@ -180,8 +200,8 @@ function Workouts({ userRole }: WorkoutsProps) {
     if (!formData.name || !formData.description || !formData.difficulty || !formData.type || formData.duration <= 0) {
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: 'Vui lòng điền đầy đủ thông tin bắt buộc'
+        title: 'Error',
+        message: 'Please fill in all required fields'
       });
       return;
     }
@@ -200,20 +220,20 @@ function Workouts({ userRole }: WorkoutsProps) {
       
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: 'Đã tạo bài tập mới'
+        title: 'Success',
+        message: 'Created new workout'
       });
 
       setShowCreateModal(false);
       resetForm();
-      fetchWorkouts();
+      fetchWorkouts(currentPage);
     } catch (error: unknown) {
       console.error('Failed to create workout:', error);
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể tạo bài tập'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to create workout'
       });
     } finally {
       setIsSubmitting(false);
@@ -237,20 +257,20 @@ function Workouts({ userRole }: WorkoutsProps) {
       
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: 'Đã cập nhật bài tập'
+        title: 'Success',
+        message: 'Updated workout'
       });
 
       setShowEditModal(false);
       resetForm();
-      fetchWorkouts();
+      fetchWorkouts(currentPage);
     } catch (error: unknown) {
       console.error('Failed to update workout:', error);
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể cập nhật bài tập'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to update workout'
       });
     } finally {
       setIsSubmitting(false);
@@ -266,20 +286,20 @@ function Workouts({ userRole }: WorkoutsProps) {
       
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: `Đã xóa bài tập "${selectedWorkout.name}"`
+        title: 'Success',
+        message: `Deleted workout "${selectedWorkout.name}"`
       });
 
       setShowDeleteModal(false);
       setSelectedWorkout(null);
-      fetchWorkouts();
+      fetchWorkouts(currentPage);
     } catch (error: unknown) {
       console.error('Failed to delete workout:', error);
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể xóa bài tập'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to delete workout'
       });
     } finally {
       setIsSubmitting(false);
@@ -326,7 +346,7 @@ function Workouts({ userRole }: WorkoutsProps) {
         <div className="workouts__header-actions">
           <button 
             className="workouts__refresh-btn" 
-            onClick={fetchWorkouts}
+            onClick={() => fetchWorkouts(currentPage)}
             disabled={isLoading}
             title="Refresh"
           >
@@ -427,7 +447,8 @@ function Workouts({ userRole }: WorkoutsProps) {
           <p>Try adjusting your filters or create a new workout.</p>
         </div>
       ) : (
-        /* Workout Cards Grid */
+        <>
+        {/* Workout Cards Grid */}
         <div className="workouts__grid">
           {filteredWorkouts.map((workout) => {
             const difficultyBadge = getDifficultyBadge(workout.difficulty);
@@ -492,6 +513,32 @@ function Workouts({ userRole }: WorkoutsProps) {
             );
           })}
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="workouts__pagination">
+            <button 
+              className="workouts__pagination-btn"
+              onClick={handlePrevPage}
+              disabled={currentPage === 1}
+            >
+              <ChevronLeft size={18} />
+              Previous
+            </button>
+            <span className="workouts__pagination-info">
+              Page {currentPage} of {totalPages} ({totalItems} items)
+            </span>
+            <button 
+              className="workouts__pagination-btn"
+              onClick={handleNextPage}
+              disabled={currentPage === totalPages}
+            >
+              Next
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        )}
+        </>
       )}
 
       {/* Create Workout Modal */}

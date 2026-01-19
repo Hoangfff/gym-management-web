@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, ChevronDown, Eye, RefreshCw } from 'lucide-react';
+import { Plus, Search, ChevronDown, Eye, RefreshCw, Pencil, Trash2 } from 'lucide-react';
 import Modal from '../../Modal/index.ts';
-import { useToast } from '../../../ui/index.ts';
+import { ConfirmModal, useToast } from '../../../ui/index.ts';
 import { contractApi, memberApi, ptApi, packageApi } from '../../../../services/index.ts';
 import type {
   ApiContract,
   ContractStatusEnum,
   ReqCreateContractDTO,
+  ReqUpdateContractDTO,
   ApiMember,
   ApiPersonalTrainer,
   ApiServicePackage
@@ -67,7 +68,9 @@ function Contracts({ userRole: _userRole }: ContractsProps) {
   
   // Modal states
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedContract, setSelectedContract] = useState<ApiContract | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -238,6 +241,103 @@ function Contracts({ userRole: _userRole }: ContractsProps) {
     setIsDetailsModalOpen(true);
   };
 
+  const openEditModal = (contract: ApiContract) => {
+    setSelectedContract(contract);
+    setFormData({
+      memberId: contract.memberId,
+      packageId: contract.packageId,
+      ptId: contract.ptId || undefined,
+      startDate: contract.startDate,
+      paymentMethod: 'CASH', // Not used in update
+      discountAmount: 0,
+      notes: contract.notes || ''
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const openDeleteModal = (contract: ApiContract) => {
+    setSelectedContract(contract);
+    setIsDeleteModalOpen(true);
+  };
+
+  // Update contract
+  const handleUpdateContract = async () => {
+    if (!selectedContract) return;
+
+    if (!formData.packageId || !formData.startDate) {
+      showToast({
+        type: 'error',
+        title: 'Validation Error',
+        message: 'Please fill in all required fields'
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const selectedPackage = packages.find(p => p.id === formData.packageId);
+      const endDate = selectedPackage 
+        ? calculateEndDate(formData.startDate, selectedPackage.durationInDays)
+        : formData.startDate;
+
+      const updateData: ReqUpdateContractDTO = {
+        packageId: formData.packageId,
+        ptId: formData.ptId || undefined,
+        startDate: formData.startDate,
+        endDate: endDate,
+        totalSessions: selectedPackage?.numberOfSessions,
+        notes: formData.notes || undefined
+      };
+      
+      await contractApi.update(selectedContract.id, updateData);
+      showToast({
+        type: 'success',
+        title: 'Success',
+        message: 'Contract updated successfully'
+      });
+      setIsEditModalOpen(false);
+      setFormData(initialFormData);
+      setSelectedContract(null);
+      fetchContracts();
+    } catch (error) {
+      console.error('Error updating contract:', error);
+      showToast({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to update contract'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Delete contract
+  const handleDeleteContract = async () => {
+    if (!selectedContract) return;
+
+    setIsSubmitting(true);
+    try {
+      await contractApi.delete(selectedContract.id);
+      showToast({
+        type: 'success',
+        title: 'Success',
+        message: 'Contract deleted successfully'
+      });
+      setIsDeleteModalOpen(false);
+      setSelectedContract(null);
+      fetchContracts();
+    } catch (error) {
+      console.error('Error deleting contract:', error);
+      showToast({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to delete contract'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   // Helpers
   const getStatusClass = (status: ContractStatusEnum) => {
     switch (status) {
@@ -383,6 +483,20 @@ function Contracts({ userRole: _userRole }: ContractsProps) {
                   >
                     <Eye size={18} />
                   </button>
+                  <button 
+                    className="contract-card__action-btn contract-card__action-btn--edit" 
+                    onClick={() => openEditModal(contract)}
+                    title="Edit Contract"
+                  >
+                    <Pencil size={18} />
+                  </button>
+                  <button 
+                    className="contract-card__action-btn contract-card__action-btn--delete" 
+                    onClick={() => openDeleteModal(contract)}
+                    title="Delete Contract"
+                  >
+                    <Trash2 size={18} />
+                  </button>
                 </div>
               </div>
               <div className="contract-card__details">
@@ -399,7 +513,7 @@ function Contracts({ userRole: _userRole }: ContractsProps) {
                 <div className="contract-card__detail">
                   <span className="contract-card__detail-label">Sessions</span>
                   <span className="contract-card__detail-value">
-                    {contract.remainingSessions}/{contract.totalSessions}
+                    {contract.totalSessions - contract.remainingSessions}/{contract.totalSessions}
                   </span>
                 </div>
                 <div className="contract-card__detail">
@@ -623,6 +737,167 @@ function Contracts({ userRole: _userRole }: ContractsProps) {
         </form>
       </Modal>
 
+      {/* Edit Contract Modal */}
+      <Modal 
+        isOpen={isEditModalOpen} 
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setFormData(initialFormData);
+          setSelectedContract(null);
+        }} 
+        title="Edit contract"
+      >
+        {selectedContract && (
+          <form className="modal-form" onSubmit={(e) => { e.preventDefault(); handleUpdateContract(); }}>
+            <div className="modal-form__group">
+              <label className="modal-form__label">Member</label>
+              <input
+                type="text"
+                className="modal-form__input"
+                value={selectedContract.memberName}
+                disabled
+                style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed' }}
+              />
+              <p className="modal-form__hint">Member cannot be changed</p>
+            </div>
+            
+            <div className="modal-form__group">
+              <label className="modal-form__label modal-form__label--required">Service Package</label>
+              <select 
+                className="modal-form__select" 
+                value={formData.packageId || ''} 
+                onChange={(e) => setFormData({ 
+                  ...formData, 
+                  packageId: parseInt(e.target.value) || 0,
+                  ptId: undefined
+                })}
+                required
+              >
+                <option value="">Select package</option>
+                {packages.map(pkg => (
+                  <option key={pkg.id} value={pkg.id}>
+                    {pkg.packageName} - {formatCurrency(pkg.price)} ({pkg.durationInDays} days, {pkg.numberOfSessions} sessions)
+                    {pkg.type === 'PT_INCLUDED' ? ' [PT Included]' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            {getSelectedPackageInfo() && (
+              <div className="modal-form__package-info">
+                <h4>Package Details</h4>
+                <div className="modal-form__package-details">
+                  <div className="modal-form__package-detail">
+                    <span>Price:</span>
+                    <strong>{formatCurrency(getSelectedPackageInfo()?.price || 0)}</strong>
+                  </div>
+                  <div className="modal-form__package-detail">
+                    <span>Duration:</span>
+                    <strong>{getSelectedPackageInfo()?.durationInDays} days</strong>
+                  </div>
+                  <div className="modal-form__package-detail">
+                    <span>Sessions:</span>
+                    <strong>{getSelectedPackageInfo()?.numberOfSessions}</strong>
+                  </div>
+                  <div className="modal-form__package-detail">
+                    <span>PT Included:</span>
+                    <strong>{getSelectedPackageInfo()?.type === 'PT_INCLUDED' ? 'Yes' : 'No'}</strong>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {selectedPackageRequiresPT() && (
+              <div className="modal-form__group">
+                <label className="modal-form__label modal-form__label--required">Personal Trainer</label>
+                <select 
+                  className="modal-form__select" 
+                  value={formData.ptId || ''} 
+                  onChange={(e) => setFormData({ ...formData, ptId: parseInt(e.target.value) || undefined })}
+                  required
+                >
+                  <option value="">Select Personal Trainer</option>
+                  {pts.map(pt => (
+                    <option key={pt.id} value={pt.id}>
+                      {pt.user.fullname}
+                    </option>
+                  ))}
+                </select>
+                <p className="modal-form__hint">
+                  This package includes PT sessions. Please select a trainer.
+                </p>
+              </div>
+            )}
+
+            {!selectedPackageRequiresPT() && formData.packageId > 0 && (
+              <div className="modal-form__group">
+                <label className="modal-form__label">Personal Trainer (Optional)</label>
+                <select 
+                  className="modal-form__select" 
+                  value={formData.ptId || ''} 
+                  onChange={(e) => setFormData({ ...formData, ptId: parseInt(e.target.value) || undefined })}
+                >
+                  <option value="">No PT assigned</option>
+                  {pts.map(pt => (
+                    <option key={pt.id} value={pt.id}>
+                      {pt.user.fullname}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            
+            <div className="modal-form__group">
+              <label className="modal-form__label modal-form__label--required">Start Date</label>
+              <input
+                type="date"
+                className="modal-form__input"
+                value={formData.startDate}
+                onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                required
+              />
+              {formData.startDate && getSelectedPackageInfo() && (
+                <p className="modal-form__hint">
+                  End date will be: <strong>{formatDate(calculateEndDate(formData.startDate, getSelectedPackageInfo()?.durationInDays || 0))}</strong>
+                </p>
+              )}
+            </div>
+            
+            <div className="modal-form__group">
+              <label className="modal-form__label">Notes (Optional)</label>
+              <textarea
+                className="modal-form__textarea"
+                placeholder="Add any special notes or terms..."
+                value={formData.notes || ''}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                rows={3}
+              />
+            </div>
+            
+            <div className="modal-form__actions">
+              <button 
+                type="button" 
+                className="modal-form__btn modal-form__btn--secondary" 
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  setFormData(initialFormData);
+                  setSelectedContract(null);
+                }}
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit" 
+                className="modal-form__btn modal-form__btn--primary"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Updating...' : 'Update Contract'}
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
       {/* Contract Details Modal */}
       <Modal 
         isOpen={isDetailsModalOpen} 
@@ -786,6 +1061,25 @@ function Contracts({ userRole: _userRole }: ContractsProps) {
           </div>
         )}
       </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setSelectedContract(null);
+        }}
+        onConfirm={handleDeleteContract}
+        title="Delete Contract"
+        message={
+          selectedContract 
+            ? `Are you sure you want to delete Contract #${selectedContract.id} for ${selectedContract.memberName}? This action cannot be undone.`
+            : ''
+        }
+        confirmText="Delete"
+        variant="danger"
+        isLoading={isSubmitting}
+      />
     </div>
   );
 }

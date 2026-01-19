@@ -89,7 +89,8 @@ function Sidebar({
             </div>
           )}
         </div>
-        <h3 className="sidebar__role">{roleLabel}</h3>
+        <h3 className="sidebar__name">{userName}</h3>
+        <p className="sidebar__role">{roleLabel}</p>
         <p className="sidebar__email">{userEmail}</p>
       </div>
 

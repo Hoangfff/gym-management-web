@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button, Input, Checkbox } from '../../components/ui/index.ts';
 import { authApi } from '../../services/index.ts';
@@ -19,6 +19,19 @@ function LoginPage() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Load saved credentials on mount
+  useEffect(() => {
+    const savedUsername = localStorage.getItem('savedUsername');
+    const savedPassword = localStorage.getItem('savedPassword');
+    if (savedUsername && savedPassword) {
+      setFormData({
+        username: savedUsername,
+        password: savedPassword,
+        rememberMe: true
+      });
+    }
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -48,22 +61,28 @@ function LoginPage() {
       });
 
       if (response.data) {
-        const { token, user } = response.data;
+        const { access_token, user, role } = response.data;
         
-        // Store token
+        // Store token and user info
+        const storage = formData.rememberMe ? localStorage : sessionStorage;
+        storage.setItem('accessToken', access_token);
+        storage.setItem('user', JSON.stringify(user));
+        storage.setItem('role', JSON.stringify(role));
+
+        // Handle remember me for credentials
         if (formData.rememberMe) {
-          localStorage.setItem('accessToken', token);
-          localStorage.setItem('user', JSON.stringify(user));
+          localStorage.setItem('savedUsername', formData.username);
+          localStorage.setItem('savedPassword', formData.password);
         } else {
-          sessionStorage.setItem('accessToken', token);
-          sessionStorage.setItem('user', JSON.stringify(user));
+          localStorage.removeItem('savedUsername');
+          localStorage.removeItem('savedPassword');
         }
 
         // Navigate based on user role
-        const role = user.role?.toLowerCase();
-        if (role === 'ADMIN') {
+        const roleName = role.roleName.toUpperCase();
+        if (roleName === 'ADMIN') {
           navigate('/admin');
-        } else if (role === 'PT' || role === 'personal_trainer') {
+        } else if (roleName === 'PT') {
           navigate('/pt');
         } else {
           navigate('/');
@@ -104,13 +123,13 @@ function LoginPage() {
 
           <form className="auth-form" onSubmit={handleSubmit}>
             <Input
-              label="Username"
+              label="Email"
               type="text"
               name="username"
               value={formData.username}
               onChange={handleInputChange}
               required
-              placeholder="Enter your username"
+              placeholder="example@email.com"
               disabled={isLoading}
             />
 

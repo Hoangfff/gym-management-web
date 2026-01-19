@@ -81,8 +81,8 @@ function TimeSlots({ userRole }: TimeSlotsProps) {
       console.error('Failed to fetch time slots:', error);
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: 'Không thể tải danh sách khung giờ'
+        title: 'Error',
+        message: 'Failed to load time slots list'
       });
     } finally {
       setIsLoading(false);
@@ -98,8 +98,8 @@ function TimeSlots({ userRole }: TimeSlotsProps) {
     if (!formData.slotName || !formData.startTime || !formData.endTime) {
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: 'Vui lòng điền đầy đủ thông tin'
+        title: 'Error',
+        message: 'Please fill in all required fields'
       });
       return;
     }
@@ -116,8 +116,8 @@ function TimeSlots({ userRole }: TimeSlotsProps) {
 
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: 'Đã thêm khung giờ mới'
+        title: 'Success',
+        message: 'Added new time slot'
       });
 
       setIsAddModalOpen(false);
@@ -128,8 +128,8 @@ function TimeSlots({ userRole }: TimeSlotsProps) {
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể thêm khung giờ'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to add time slot'
       });
     } finally {
       setIsSubmitting(false);
@@ -151,8 +151,8 @@ function TimeSlots({ userRole }: TimeSlotsProps) {
 
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: 'Đã cập nhật khung giờ'
+        title: 'Success',
+        message: 'Updated time slot'
       });
 
       setIsEditModalOpen(false);
@@ -164,8 +164,8 @@ function TimeSlots({ userRole }: TimeSlotsProps) {
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể cập nhật khung giờ'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to update time slot'
       });
     } finally {
       setIsSubmitting(false);
@@ -181,8 +181,8 @@ function TimeSlots({ userRole }: TimeSlotsProps) {
 
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: `Đã xóa khung giờ ${selectedSlot.slotName}`
+        title: 'Success',
+        message: `Deleted time slot ${selectedSlot.slotName}`
       });
 
       setIsDeleteModalOpen(false);
@@ -193,8 +193,8 @@ function TimeSlots({ userRole }: TimeSlotsProps) {
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể xóa khung giờ'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to delete time slot'
       });
     } finally {
       setIsSubmitting(false);
@@ -206,8 +206,8 @@ function TimeSlots({ userRole }: TimeSlotsProps) {
       await slotApi.activate(slot.id);
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: `Đã kích hoạt khung giờ ${slot.slotName}`
+        title: 'Success',
+        message: `Activated time slot ${slot.slotName}`
       });
       fetchTimeSlots();
     } catch (error: unknown) {
@@ -215,8 +215,8 @@ function TimeSlots({ userRole }: TimeSlotsProps) {
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể kích hoạt khung giờ'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to activate time slot'
       });
     }
   };

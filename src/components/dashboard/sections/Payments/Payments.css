@@ -764,3 +764,146 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Header Actions */
+.payments__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.payments__order-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background-color: #16a34a;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.payments__order-btn:hover:not(:disabled) {
+  background-color: #15803d;
+}
+
+.payments__order-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Payment Status Badges */
+.payments__payment-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 12px;
+}
+
+.payments__payment-status--unpaid {
+  background-color: #fee2e2;
+  color: #dc2626;
+}
+
+.payments__payment-status--paid {
+  background-color: #dcfce7;
+  color: #16a34a;
+}
+
+.payments__payment-status--partial {
+  background-color: #fef3c7;
+  color: #d97706;
+}
+
+/* Status Issued */
+.payments__status--issued {
+  background-color: #dbeafe;
+  color: #2563eb;
+}
+
+/* Orange stat value */
+.payments__stat-value--orange {
+  color: #d97706;
+}
+
+/* Detail Statuses */
+.payments__detail-statuses {
+  display: flex;
+  gap: 8px;
+}
+
+/* Discount Amount */
+.payments__discount-amount {
+  color: #dc2626;
+}
+
+/* Final Amount */
+.payments__final-amount {
+  color: #16a34a;
+}
+
+/* Card Total Row Final */
+.payments__card-total-row--final {
+  border-top: 1px solid #e0e0e0;
+  padding-top: 8px;
+  margin-top: 4px;
+}
+
+/* Card Meta */
+.payments__card-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #666;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed #e0e0e0;
+}
+
+/* Service Info in Order Modal */
+.payments__service-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background-color: #f3f4f6;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: #666;
+}
+
+/* Order Summary */
+.payments__order-summary {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.payments__order-summary-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  padding: 4px 0;
+}
+
+.payments__order-summary-row--total {
+  border-top: 1px solid #e0e0e0;
+  margin-top: 8px;
+  padding-top: 8px;
+  font-weight: 600;
+}
+
+/* Modal Form Row */
+.modal-form__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}

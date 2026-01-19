@@ -4,38 +4,34 @@ import Modal from '../../Modal/index.ts';
 import { useToast, ConfirmModal } from '../../../ui/index.ts';
 import { availableSlotApi, slotApi, ptApi } from '../../../../services/index.ts';
 import type { 
-  ApiAvailableSlot, 
-  AvailableSlotStatusEnum,
+  ApiPtAvailableSlot,
+  DayOfWeekEnum,
   ApiTimeSlot,
   ApiPersonalTrainer
 } from '../../../../types/api.ts';
 import './PTAvailability.css';
 
-const AvailableSlotStatus = {
-  AVAILABLE: 'AVAILABLE' as AvailableSlotStatusEnum,
-  BOOKED: 'BOOKED' as AvailableSlotStatusEnum,
-  CANCELLED: 'CANCELLED' as AvailableSlotStatusEnum
+const DAY_ORDER: Record<DayOfWeekEnum, number> = {
+  MONDAY: 1,
+  TUESDAY: 2,
+  WEDNESDAY: 3,
+  THURSDAY: 4,
+  FRIDAY: 5,
+  SATURDAY: 6,
+  SUNDAY: 7
 };
-
-const STATUS_OPTIONS: { value: AvailableSlotStatusEnum | 'all'; label: string }[] = [
-  { value: 'all', label: 'All Status' },
-  { value: 'AVAILABLE', label: 'Available' },
-  { value: 'BOOKED', label: 'Booked' },
-  { value: 'CANCELLED', label: 'Cancelled' }
-];
 
 function PTAvailabilitySection() {
   const { showToast } = useToast();
   
   // Data states
-  const [availableSlots, setAvailableSlots] = useState<ApiAvailableSlot[]>([]);
+  const [availableSlots, setAvailableSlots] = useState<ApiPtAvailableSlot[]>([]);
   const [timeSlots, setTimeSlots] = useState<ApiTimeSlot[]>([]);
   const [pts, setPts] = useState<ApiPersonalTrainer[]>([]);
   
   // UI states
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<AvailableSlotStatusEnum | 'all'>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
@@ -56,58 +52,55 @@ function PTAvailabilitySection() {
     setIsLoading(true);
     try {
       const [slotsRes, timeSlotsRes, ptsRes] = await Promise.all([
-        availableSlotApi.getAll(),
+        availableSlotApi.getMyAvailableSlots(),
         slotApi.getAll(),
         ptApi.getAll()
       ]);
       
-      setAvailableSlots(slotsRes.data?.result || []);
+      // Handle nested data structure from API
+      const slotsData = slotsRes.data?.data || [];
+      setAvailableSlots(slotsData);
       setTimeSlots(timeSlotsRes.data || []);
       setPts(ptsRes.data || []);
     } catch (error) {
       console.error('Failed to fetch data:', error);
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: 'Không thể tải dữ liệu'
+        title: 'Error',
+        message: 'Failed to load data'
       });
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Stats
+  // Stats - group by day of week
+  const slotsByDay = availableSlots.reduce((acc, slot) => {
+    if (!acc[slot.dayOfWeek]) {
+      acc[slot.dayOfWeek] = [];
+    }
+    acc[slot.dayOfWeek].push(slot);
+    return acc;
+  }, {} as Record<DayOfWeekEnum, ApiPtAvailableSlot[]>);
+
   const stats = {
     total: availableSlots.length,
-    available: availableSlots.filter(s => s.status === AvailableSlotStatus.AVAILABLE).length,
-    booked: availableSlots.filter(s => s.status === AvailableSlotStatus.BOOKED).length,
-    cancelled: availableSlots.filter(s => s.status === AvailableSlotStatus.CANCELLED).length
+    days: Object.keys(slotsByDay).length,
+    monday: slotsByDay.MONDAY?.length || 0,
+    wednesday: slotsByDay.WEDNESDAY?.length || 0
   };
 
-  // Filter slots
-  const filteredSlots = availableSlots.filter(slot => {
-    if (statusFilter === 'all') return true;
-    return slot.status === statusFilter;
-  });
-
-  // Group by date
-  const slotsByDate = filteredSlots.reduce((acc, slot) => {
-    const date = slot.availableDate;
-    if (!acc[date]) {
-      acc[date] = [];
-    }
-    acc[date].push(slot);
-    return acc;
-  }, {} as Record<string, ApiAvailableSlot[]>);
-
-  const sortedDates = Object.keys(slotsByDate).sort();
+  // Sort days by day order
+  const sortedDays = Object.keys(slotsByDay).sort((a, b) => 
+    DAY_ORDER[a as DayOfWeekEnum] - DAY_ORDER[b as DayOfWeekEnum]
+  ) as DayOfWeekEnum[];
 
   const handleCreateSlot = async () => {
     if (!formData.ptId || !formData.slotId || !formData.availableDate) {
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: 'Vui lòng điền đầy đủ thông tin'
+        title: 'Error',
+        message: 'Please fill in all required fields'
       });
       return;
     }
@@ -122,8 +115,8 @@ function PTAvailabilitySection() {
       
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: 'Đã thêm slot khả dụng'
+        title: 'Success',
+        message: 'Added available slot'
       });
       
       setIsAddModalOpen(false);
@@ -134,8 +127,8 @@ function PTAvailabilitySection() {
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể tạo slot'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to create slot'
       });
     } finally {
       setIsSubmitting(false);
@@ -155,8 +148,8 @@ function PTAvailabilitySection() {
       await availableSlotApi.delete(selectedSlotId);
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: 'Đã xóa slot'
+        title: 'Success',
+        message: 'Deleted slot'
       });
       setShowDeleteModal(false);
       setSelectedSlotId(null);
@@ -166,30 +159,30 @@ function PTAvailabilitySection() {
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể xóa slot'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to delete slot'
       });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const getStatusBadgeClass = (status: AvailableSlotStatusEnum) => {
-    switch (status) {
-      case 'AVAILABLE': return 'pt-availability__status--available';
-      case 'BOOKED': return 'pt-availability__status--booked';
-      case 'CANCELLED': return 'pt-availability__status--cancelled';
-      default: return '';
-    }
+  const getDayLabel = (day: DayOfWeekEnum): string => {
+    const labels: Record<DayOfWeekEnum, string> = {
+      MONDAY: 'Monday',
+      TUESDAY: 'Tuesday',
+      WEDNESDAY: 'Wednesday',
+      THURSDAY: 'Thursday',
+      FRIDAY: 'Friday',
+      SATURDAY: 'Saturday',
+      SUNDAY: 'Sunday'
+    };
+    return labels[day];
   };
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('vi-VN', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+  const formatTime = (timeStr: string) => {
+    // HH:mm:ss -> HH:mm
+    return timeStr.substring(0, 5);
   };
 
   return (
@@ -221,29 +214,17 @@ function PTAvailabilitySection() {
           <span className="stat-box__value">{stats.total}</span>
         </div>
         <div className="stat-box">
-          <span className="stat-box__label">Available</span>
-          <span className="stat-box__value stat-box__value--green">{stats.available}</span>
+          <span className="stat-box__label">Active Days</span>
+          <span className="stat-box__value stat-box__value--green">{stats.days}</span>
         </div>
         <div className="stat-box">
-          <span className="stat-box__label">Booked</span>
-          <span className="stat-box__value stat-box__value--blue">{stats.booked}</span>
+          <span className="stat-box__label">Monday Slots</span>
+          <span className="stat-box__value stat-box__value--blue">{stats.monday}</span>
         </div>
         <div className="stat-box">
-          <span className="stat-box__label">Cancelled</span>
-          <span className="stat-box__value stat-box__value--red">{stats.cancelled}</span>
+          <span className="stat-box__label">Wednesday Slots</span>
+          <span className="stat-box__value stat-box__value--purple">{stats.wednesday}</span>
         </div>
-      </div>
-
-      <div className="pt-availability__filters">
-        <select 
-          className="pt-availability__filter-select"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as AvailableSlotStatusEnum | 'all')}
-        >
-          {STATUS_OPTIONS.map(opt => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
       </div>
 
       {isLoading ? (
@@ -251,40 +232,40 @@ function PTAvailabilitySection() {
           <RefreshCw size={32} className="spinning" />
           <p>Loading availability...</p>
         </div>
-      ) : filteredSlots.length === 0 ? (
+      ) : availableSlots.length === 0 ? (
         <div className="pt-availability__empty">
           <Calendar size={48} />
-          <h3>No availability slots found</h3>
-          <p>Add new availability slots to get started.</p>
+          <h3>No availability slots configured</h3>
+          <p>Add your available time slots to let members book sessions with you.</p>
         </div>
       ) : (
         <div className="pt-availability__schedule">
-          {sortedDates.map(date => (
-            <div key={date} className="pt-availability__day">
+          {sortedDays.map(day => (
+            <div key={day} className="pt-availability__day">
               <div className="pt-availability__day-header">
-                <span className="pt-availability__day-name">{formatDate(date)}</span>
+                <span className="pt-availability__day-name">{getDayLabel(day)}</span>
                 <span className="pt-availability__day-count">
-                  {slotsByDate[date].length} slot{slotsByDate[date].length !== 1 ? 's' : ''}
+                  {slotsByDay[day].length} slot{slotsByDay[day].length !== 1 ? 's' : ''}
                 </span>
               </div>
               <div className="pt-availability__day-slots">
-                {slotsByDate[date].map(slot => (
+                {slotsByDay[day].map(slot => (
                   <div key={slot.id} className="pt-availability__slot-chip">
                     <Clock size={14} />
-                    <span className="pt-availability__slot-name">{slot.slotCode}</span>
-                    <span className="pt-availability__slot-time">{slot.slotDescription}</span>
-                    <span className="pt-availability__slot-pt">PT: {slot.ptName}</span>
-                    <span className={`pt-availability__status ${getStatusBadgeClass(slot.status)}`}>
-                      {slot.status}
+                    <span className="pt-availability__slot-name">{slot.slot.slotName}</span>
+                    <span className="pt-availability__slot-time">
+                      {formatTime(slot.slot.startTime)} - {formatTime(slot.slot.endTime)}
                     </span>
-                    {slot.status === 'AVAILABLE' && (
-                      <button 
-                        className="pt-availability__slot-remove"
-                        onClick={() => handleDeleteClick(slot.id)}
-                      >
-                        <X size={14} />
-                      </button>
-                    )}
+                    <span className={`pt-availability__status ${slot.isAvailable ? 'pt-availability__status--available' : 'pt-availability__status--unavailable'}`}>
+                      {slot.isAvailable ? 'Available' : 'Unavailable'}
+                    </span>
+                    <button 
+                      className="pt-availability__slot-remove"
+                      onClick={() => handleDeleteClick(slot.id)}
+                      title="Remove slot"
+                    >
+                      <X size={14} />
+                    </button>
                   </div>
                 ))}
               </div>

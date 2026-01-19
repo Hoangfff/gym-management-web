@@ -79,8 +79,8 @@ function BodyMetrics({ userRole }: BodyMetricsProps) {
       console.error('Failed to fetch body metrics:', error);
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: 'Không thể tải danh sách chỉ số cơ thể'
+        title: 'Error',
+        message: 'Failed to load body metrics list'
       });
     } finally {
       setIsLoading(false);
@@ -108,8 +108,8 @@ function BodyMetrics({ userRole }: BodyMetricsProps) {
       console.error('Failed to fetch body metrics:', error);
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: 'Không thể tải chỉ số của thành viên'
+        title: 'Error',
+        message: 'Failed to load member body metrics'
       });
     } finally {
       setIsLoading(false);
@@ -144,8 +144,8 @@ function BodyMetrics({ userRole }: BodyMetricsProps) {
     if (!formData.memberId || !formData.weight || !formData.height || !formData.measuredDate) {
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: 'Vui lòng điền đầy đủ thông tin bắt buộc'
+        title: 'Error',
+        message: 'Please fill in all required fields'
       });
       return;
     }
@@ -166,8 +166,8 @@ function BodyMetrics({ userRole }: BodyMetricsProps) {
 
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: 'Đã thêm chỉ số cơ thể mới'
+        title: 'Success',
+        message: 'Added new body metrics'
       });
 
       setIsAddModalOpen(false);
@@ -178,8 +178,8 @@ function BodyMetrics({ userRole }: BodyMetricsProps) {
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể thêm chỉ số cơ thể'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to add body metrics'
       });
     } finally {
       setIsSubmitting(false);
@@ -204,8 +204,8 @@ function BodyMetrics({ userRole }: BodyMetricsProps) {
 
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: 'Đã cập nhật chỉ số cơ thể'
+        title: 'Success',
+        message: 'Updated body metrics'
       });
 
       setIsEditModalOpen(false);
@@ -217,8 +217,8 @@ function BodyMetrics({ userRole }: BodyMetricsProps) {
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể cập nhật chỉ số'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to update body metrics'
       });
     } finally {
       setIsSubmitting(false);
@@ -234,8 +234,8 @@ function BodyMetrics({ userRole }: BodyMetricsProps) {
 
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: 'Đã xóa chỉ số cơ thể'
+        title: 'Success',
+        message: 'Deleted body metrics'
       });
 
       setIsDeleteModalOpen(false);
@@ -246,8 +246,8 @@ function BodyMetrics({ userRole }: BodyMetricsProps) {
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể xóa chỉ số'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to delete body metrics'
       });
     } finally {
       setIsSubmitting(false);

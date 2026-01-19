@@ -100,8 +100,8 @@ function Customers({ userRole, currentUserId }: CustomersProps) {
       console.error('Failed to fetch members:', error);
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: 'Không thể tải danh sách hội viên'
+        title: 'Error',
+        message: 'Failed to load members'
       });
     } finally {
       setIsLoading(false);
@@ -230,8 +230,8 @@ function Customers({ userRole, currentUserId }: CustomersProps) {
     if (!formData.fullname || !formData.email || !formData.password || !formData.gender || !formData.dob || !formData.phoneNumber || !formData.cccd) {
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: 'Vui lòng điền đầy đủ thông tin bắt buộc'
+        title: 'Error',
+        message: 'Please fill in all required fields'
       });
       return;
     }
@@ -254,8 +254,8 @@ function Customers({ userRole, currentUserId }: CustomersProps) {
       
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: 'Đã thêm hội viên mới'
+        title: 'Success',
+        message: 'Added new member'
       });
 
       setShowAddModal(false);
@@ -266,8 +266,8 @@ function Customers({ userRole, currentUserId }: CustomersProps) {
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể thêm hội viên'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to add member'
       });
     } finally {
       setIsSubmitting(false);
@@ -293,8 +293,8 @@ function Customers({ userRole, currentUserId }: CustomersProps) {
       
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: 'Đã cập nhật thông tin hội viên'
+        title: 'Success',
+        message: 'Updated member information'
       });
 
       setShowEditModal(false);
@@ -305,8 +305,8 @@ function Customers({ userRole, currentUserId }: CustomersProps) {
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể cập nhật thông tin'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to update member information'
       });
     } finally {
       setIsSubmitting(false);
@@ -322,8 +322,8 @@ function Customers({ userRole, currentUserId }: CustomersProps) {
       
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: `Đã xóa hội viên ${selectedMember.user.fullname}`
+        title: 'Success',
+        message: `Deleted member ${selectedMember.user.fullname}`
       });
 
       setShowDeleteModal(false);
@@ -334,8 +334,8 @@ function Customers({ userRole, currentUserId }: CustomersProps) {
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể xóa hội viên'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to delete member'
       });
     } finally {
       setIsSubmitting(false);
@@ -441,7 +441,10 @@ function Customers({ userRole, currentUserId }: CustomersProps) {
       <div className="customers__entities">
         <span>Show Entities</span>
         <div className="customers__select-wrapper customers__select-wrapper--small">
-          <select value={showEntities} onChange={(e) => setShowEntities(Number(e.target.value))}>
+          <select value={showEntities} onChange={(e) => {
+            setShowEntities(Number(e.target.value));
+            setCurrentPage(1);
+          }}>
             <option value={4}>4</option>
             <option value={8}>8</option>
             <option value={12}>12</option>

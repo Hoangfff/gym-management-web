@@ -15,6 +15,7 @@ export {
   bookingApi,
   availableSlotApi,
   invoiceApi,
+  checkInApi,
   apiClient 
 } from './api.ts';
 export { default as apiService } from './api.ts';

@@ -80,8 +80,8 @@ function ServicePackages({ userRole }: ServicePackagesProps) {
       console.error('Failed to fetch packages:', error);
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: 'Không thể tải danh sách gói dịch vụ'
+        title: 'Error',
+        message: 'Failed to load service packages'
       });
     } finally {
       setIsLoading(false);
@@ -103,8 +103,8 @@ function ServicePackages({ userRole }: ServicePackagesProps) {
       console.error('Failed to search packages:', error);
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: 'Không thể tìm kiếm gói dịch vụ'
+        title: 'Error',
+        message: 'Failed to search service packages'
       });
     } finally {
       setIsLoading(false);
@@ -127,8 +127,8 @@ function ServicePackages({ userRole }: ServicePackagesProps) {
       console.error('Failed to filter packages:', error);
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: 'Không thể lọc gói dịch vụ'
+        title: 'Error',
+        message: 'Failed to filter service packages'
       });
     } finally {
       setIsLoading(false);
@@ -152,8 +152,8 @@ function ServicePackages({ userRole }: ServicePackagesProps) {
     if (!formData.packageName || !formData.price || !formData.durationInDays || !formData.type) {
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: 'Vui lòng điền đầy đủ thông tin bắt buộc'
+        title: 'Error',
+        message: 'Please fill in all required fields'
       });
       return;
     }
@@ -174,8 +174,8 @@ function ServicePackages({ userRole }: ServicePackagesProps) {
 
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: 'Đã thêm gói dịch vụ mới'
+        title: 'Success',
+        message: 'Added new service package'
       });
 
       setIsAddModalOpen(false);
@@ -186,8 +186,8 @@ function ServicePackages({ userRole }: ServicePackagesProps) {
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể thêm gói dịch vụ'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to add service package'
       });
     } finally {
       setIsSubmitting(false);
@@ -213,8 +213,8 @@ function ServicePackages({ userRole }: ServicePackagesProps) {
 
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: 'Đã cập nhật gói dịch vụ'
+        title: 'Success',
+        message: 'Updated service package'
       });
 
       setIsEditModalOpen(false);
@@ -226,8 +226,8 @@ function ServicePackages({ userRole }: ServicePackagesProps) {
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể cập nhật gói dịch vụ'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to update service package'
       });
     } finally {
       setIsSubmitting(false);
@@ -243,8 +243,8 @@ function ServicePackages({ userRole }: ServicePackagesProps) {
 
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: `Đã xóa gói dịch vụ ${selectedPackage.packageName}`
+        title: 'Success',
+        message: `Deleted service package ${selectedPackage.packageName}`
       });
 
       setIsDeleteModalOpen(false);
@@ -255,8 +255,8 @@ function ServicePackages({ userRole }: ServicePackagesProps) {
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể xóa gói dịch vụ'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to delete service package'
       });
     } finally {
       setIsSubmitting(false);
@@ -268,8 +268,8 @@ function ServicePackages({ userRole }: ServicePackagesProps) {
       await packageApi.activate(pkg.id);
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: `Đã kích hoạt gói ${pkg.packageName}`
+        title: 'Success',
+        message: `Activated package ${pkg.packageName}`
       });
       fetchPackages();
     } catch (error: unknown) {
@@ -277,8 +277,8 @@ function ServicePackages({ userRole }: ServicePackagesProps) {
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể kích hoạt gói dịch vụ'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to activate service package'
       });
     }
   };
@@ -288,8 +288,8 @@ function ServicePackages({ userRole }: ServicePackagesProps) {
       await packageApi.deactivate(pkg.id);
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: `Đã vô hiệu hóa gói ${pkg.packageName}`
+        title: 'Success',
+        message: `Deactivated package ${pkg.packageName}`
       });
       fetchPackages();
     } catch (error: unknown) {
@@ -297,8 +297,8 @@ function ServicePackages({ userRole }: ServicePackagesProps) {
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể vô hiệu hóa gói dịch vụ'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to deactivate service package'
       });
     }
   };

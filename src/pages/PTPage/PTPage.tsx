@@ -15,8 +15,10 @@ import {
   Workouts,
   Diets,
   BodyMetrics,
-  Report
+  Report,
+  Modal
 } from '../../components/dashboard/index.ts';
+import { authApi } from '../../services/index.ts';
 import type { ActiveMember } from '../../types/index.ts';
 import './PTPage.css';
 
@@ -29,10 +31,59 @@ const mockMembers: ActiveMember[] = [
 
 function PTPage() {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const navigate = useNavigate();
 
+  // Get user info from storage
+  const getUserInfo = () => {
+    const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
+    if (userStr) {
+      try {
+        return JSON.parse(userStr);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  };
+
+  const userInfo = getUserInfo();
+  const userName = userInfo?.name || 'Personal Trainer';
+  const userEmail = userInfo?.email || 'pt@gym.com';
+
   const handleLogout = () => {
-    navigate('/login');
+    setShowLogoutModal(true);
+  };
+
+  const confirmLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await authApi.logout();
+      
+      // Clear all stored data
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('user');
+      localStorage.removeItem('role');
+      sessionStorage.removeItem('accessToken');
+      sessionStorage.removeItem('user');
+      sessionStorage.removeItem('role');
+      
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+      // Still logout locally even if API fails
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('user');
+      localStorage.removeItem('role');
+      sessionStorage.removeItem('accessToken');
+      sessionStorage.removeItem('user');
+      sessionStorage.removeItem('role');
+      navigate('/login');
+    } finally {
+      setIsLoggingOut(false);
+      setShowLogoutModal(false);
+    }
   };
 
   const renderContent = () => {
@@ -108,8 +159,8 @@ function PTPage() {
     <div className="pt-page">
       <Sidebar
         userRole="pt"
-        userName="Personal Trainer"
-        userEmail="juan.delacruz@gmail.com"
+        userName={userName}
+        userEmail={userEmail}
         activeTab={activeTab}
         onTabChange={setActiveTab}
         onLogout={handleLogout}
@@ -120,6 +171,45 @@ function PTPage() {
           {renderContent()}
         </div>
       </main>
+
+      {/* Logout Confirmation Modal */}
+      <Modal
+        isOpen={showLogoutModal}
+        onClose={() => !isLoggingOut && setShowLogoutModal(false)}
+        title="Sign Out"
+        size="sm"
+      >
+        <div className="modal-form">
+          <p style={{ marginBottom: 'var(--spacing-xl)', color: 'var(--color-gray-600)' }}>
+            Are you sure you want to sign out?
+          </p>
+          <div className="modal-form__actions">
+            <button
+              type="button"
+              className="modal-form__btn modal-form__btn--secondary"
+              onClick={() => setShowLogoutModal(false)}
+              disabled={isLoggingOut}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="modal-form__btn modal-form__btn--danger"
+              onClick={confirmLogout}
+              disabled={isLoggingOut}
+            >
+              {isLoggingOut ? (
+                <>
+                  <span className="spinner" style={{ marginRight: '8px' }}></span>
+                  Signing out...
+                </>
+              ) : (
+                'Sign Out'
+              )}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

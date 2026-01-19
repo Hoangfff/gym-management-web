@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Pencil, Trash2, Search, Eye, RefreshCw, Package, Calendar, Wrench, ChevronDown } from 'lucide-react';
+import { Pencil, Trash2, Search, Eye, RefreshCw, Package, Calendar, Wrench, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import Modal from '../../Modal/index.ts';
 import { ConfirmModal, useToast } from '../../../ui/index.ts';
 import { workoutDeviceApi } from '../../../../services/index.ts';
@@ -66,6 +66,12 @@ function Inventory() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const pageSize = 20;
+  
   // Filter state
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -90,26 +96,40 @@ function Inventory() {
     imageUrl: ''
   });
 
-  // Fetch devices on mount
+  // Fetch devices on mount and page change
   useEffect(() => {
-    fetchDevices();
-  }, []);
+    fetchDevices(currentPage);
+  }, [currentPage]);
 
-  const fetchDevices = async () => {
+  const fetchDevices = async (page: number) => {
     setIsLoading(true);
     try {
-      const response = await workoutDeviceApi.getAll();
-      setDevices(response.data);
+      const response = await workoutDeviceApi.getAll(page, pageSize);
+      // Handle paginated response: data contains { meta, result }
+      const paginatedData = response.data as { meta?: { totalPages: number; totalItems: number }; result?: ApiWorkoutDevice[] };
+      setDevices(paginatedData.result || []);
+      setTotalPages(paginatedData.meta?.totalPages || 1);
+      setTotalItems(paginatedData.meta?.totalItems || 0);
     } catch (error) {
       console.error('Failed to fetch devices:', error);
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: 'Không thể tải danh sách thiết bị'
+        title: 'Error',
+        message: 'Failed to load equipment list'
       });
+      setDevices([]);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Pagination handlers
+  const handlePrevPage = () => {
+    if (currentPage > 1) setCurrentPage(currentPage - 1);
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
   };
 
   // Filter and sort devices
@@ -183,8 +203,8 @@ function Inventory() {
     if (!formData.name || !formData.type || formData.quantity <= 0 || !formData.dateImported) {
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: 'Vui lòng điền đầy đủ thông tin bắt buộc'
+        title: 'Error',
+        message: 'Please fill in all required fields'
       });
       return;
     }
@@ -204,20 +224,20 @@ function Inventory() {
       
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: 'Đã thêm thiết bị mới'
+        title: 'Success',
+        message: 'Added new equipment'
       });
 
       setShowAddModal(false);
       resetForm();
-      fetchDevices();
+      fetchDevices(currentPage);
     } catch (error: unknown) {
       console.error('Failed to create device:', error);
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể thêm thiết bị'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to add equipment'
       });
     } finally {
       setIsSubmitting(false);
@@ -241,20 +261,20 @@ function Inventory() {
       
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: 'Đã cập nhật thiết bị'
+        title: 'Success',
+        message: 'Updated equipment'
       });
 
       setShowEditModal(false);
       resetForm();
-      fetchDevices();
+      fetchDevices(currentPage);
     } catch (error: unknown) {
       console.error('Failed to update device:', error);
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể cập nhật thiết bị'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to update equipment'
       });
     } finally {
       setIsSubmitting(false);
@@ -270,20 +290,20 @@ function Inventory() {
       
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: `Đã xóa thiết bị "${selectedDevice.name}"`
+        title: 'Success',
+        message: `Deleted equipment "${selectedDevice.name}"`
       });
 
       setShowDeleteModal(false);
       setSelectedDevice(null);
-      fetchDevices();
+      fetchDevices(currentPage);
     } catch (error: unknown) {
       console.error('Failed to delete device:', error);
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể xóa thiết bị'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to delete equipment'
       });
     } finally {
       setIsSubmitting(false);
@@ -333,7 +353,7 @@ function Inventory() {
         <div className="inventory__header-actions">
           <button 
             className="inventory__refresh-btn" 
-            onClick={fetchDevices}
+            onClick={() => fetchDevices(currentPage)}
             disabled={isLoading}
             title="Refresh"
           >
@@ -413,7 +433,8 @@ function Inventory() {
           <p>Try adjusting your filters or add new equipment.</p>
         </div>
       ) : (
-        /* Inventory Grid */
+        <>
+        {/* Inventory Grid */}
         <div className="inventory__grid">
           {filteredDevices.map((device) => {
             const typeBadge = getTypeBadge(device.type);
@@ -478,6 +499,32 @@ function Inventory() {
             );
           })}
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="inventory__pagination">
+            <button 
+              className="inventory__pagination-btn"
+              onClick={handlePrevPage}
+              disabled={currentPage === 1}
+            >
+              <ChevronLeft size={18} />
+              Previous
+            </button>
+            <span className="inventory__pagination-info">
+              Page {currentPage} of {totalPages} ({totalItems} items)
+            </span>
+            <button 
+              className="inventory__pagination-btn"
+              onClick={handleNextPage}
+              disabled={currentPage === totalPages}
+            >
+              Next
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        )}
+      </>
       )}
 
       {/* Add Modal */}

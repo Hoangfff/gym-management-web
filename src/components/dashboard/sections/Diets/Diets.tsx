@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Plus, Pencil, Trash2, RefreshCw, Search, Apple, Utensils, Droplets, Scale, ChevronRight, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, RefreshCw, Search, Apple, Utensils, Droplets, Scale, ChevronRight, ChevronLeft, X } from 'lucide-react';
 import Modal from '../../Modal/index.ts';
 import { ConfirmModal, useToast } from '../../../ui/index.ts';
 import { foodApi, dailyDietApi, dietDetailApi, memberApi, ptApi } from '../../../../services/index.ts';
 import type { 
   ApiFood, 
-  ApiDailyDiet, 
+  ApiDailyDiet,
+  ApiDietSummary, 
   ApiDietDetail,
   ApiMember,
   ApiPersonalTrainer,
@@ -62,7 +63,7 @@ function Diets({ userRole }: DietsProps) {
 
   // Data state
   const [foods, setFoods] = useState<ApiFood[]>([]);
-  const [diets, setDiets] = useState<ApiDailyDiet[]>([]);
+  const [diets, setDiets] = useState<ApiDietSummary[]>([]);
   const [members, setMembers] = useState<ApiMember[]>([]);
   const [pts, setPts] = useState<ApiPersonalTrainer[]>([]);
   const [dietDetails, setDietDetails] = useState<Record<number, ApiDietDetail[]>>({});
@@ -70,6 +71,12 @@ function Diets({ userRole }: DietsProps) {
   // Loading state
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Pagination state for diets
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [pageSize] = useState(20);
 
   // Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -128,6 +135,14 @@ function Diets({ userRole }: DietsProps) {
     fetchPTs();
   }, []);
 
+  // Fetch diets when switching to diets tab
+  useEffect(() => {
+    if (activeTab === 'diets') {
+      fetchDiets(currentPage);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
   const fetchFoods = async () => {
     setIsLoading(true);
     try {
@@ -137,8 +152,8 @@ function Diets({ userRole }: DietsProps) {
       console.error('Failed to fetch foods:', error);
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: 'Không thể tải danh sách thực phẩm'
+        title: 'Error',
+        message: 'Failed to load food list'
       });
     } finally {
       setIsLoading(false);
@@ -163,12 +178,48 @@ function Diets({ userRole }: DietsProps) {
     }
   };
 
+  const fetchDiets = async (page: number = 1) => {
+    if (activeTab !== 'diets') return;
+    setIsLoading(true);
+    try {
+      const response = await dailyDietApi.getAll(page, pageSize);
+      const paginatedData = response.data;
+      setDiets(paginatedData.result);
+      setTotalPages(paginatedData.meta.totalPages);
+      setTotalItems(paginatedData.meta.totalItems);
+      setCurrentPage(page);
+    } catch (error) {
+      console.error('Failed to fetch diets:', error);
+      showToast({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to load diet plans'
+      });
+      setDiets([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const fetchDietDetails = async (dietId: number) => {
     try {
       const response = await dietDetailApi.getByDietId(dietId);
       setDietDetails(prev => ({ ...prev, [dietId]: response.data }));
     } catch (error) {
       console.error('Failed to fetch diet details:', error);
+    }
+  };
+
+  // Pagination handlers
+  const handlePrevPage = () => {
+    if (currentPage > 1) {
+      fetchDiets(currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      fetchDiets(currentPage + 1);
     }
   };
 
@@ -192,8 +243,8 @@ function Diets({ userRole }: DietsProps) {
     if (!foodForm.name || !foodForm.proteinG || !foodForm.carbsG || !foodForm.fatG) {
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: 'Vui lòng điền đầy đủ thông tin bắt buộc'
+        title: 'Error',
+        message: 'Please fill in all required fields'
       });
       return;
     }
@@ -213,8 +264,8 @@ function Diets({ userRole }: DietsProps) {
 
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: 'Đã thêm thực phẩm mới'
+        title: 'Success',
+        message: 'Added new food'
       });
 
       setIsAddFoodModalOpen(false);
@@ -225,8 +276,8 @@ function Diets({ userRole }: DietsProps) {
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể thêm thực phẩm'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to add food'
       });
     } finally {
       setIsSubmitting(false);
@@ -251,8 +302,8 @@ function Diets({ userRole }: DietsProps) {
 
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: 'Đã cập nhật thực phẩm'
+        title: 'Success',
+        message: 'Updated food'
       });
 
       setIsEditFoodModalOpen(false);
@@ -264,8 +315,8 @@ function Diets({ userRole }: DietsProps) {
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể cập nhật thực phẩm'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to update food'
       });
     } finally {
       setIsSubmitting(false);
@@ -281,8 +332,8 @@ function Diets({ userRole }: DietsProps) {
 
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: 'Đã xóa thực phẩm'
+        title: 'Success',
+        message: 'Deleted food'
       });
 
       setIsDeleteFoodModalOpen(false);
@@ -293,8 +344,8 @@ function Diets({ userRole }: DietsProps) {
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể xóa thực phẩm'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to delete food'
       });
     } finally {
       setIsSubmitting(false);
@@ -335,8 +386,8 @@ function Diets({ userRole }: DietsProps) {
     if (!dietForm.memberId || !dietForm.ptId || !dietForm.dietDate) {
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: 'Vui lòng chọn thành viên, PT và ngày'
+        title: 'Error',
+        message: 'Please select member, PT and date'
       });
       return;
     }
@@ -351,25 +402,25 @@ function Diets({ userRole }: DietsProps) {
         note: dietForm.note || undefined
       };
 
-      const response = await dailyDietApi.create(requestData);
+      await dailyDietApi.create(requestData);
 
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: 'Đã tạo thực đơn mới'
+        title: 'Success',
+        message: 'Created new diet plan'
       });
 
       setIsAddDietModalOpen(false);
       resetDietForm();
-      // Add the new diet to the list
-      setDiets(prev => [...prev, response.data]);
+      // Refresh diets list
+      fetchDiets(1);
     } catch (error: unknown) {
       console.error('Failed to create diet:', error);
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể tạo thực đơn'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to create diet plan'
       });
     } finally {
       setIsSubmitting(false);
@@ -388,26 +439,26 @@ function Diets({ userRole }: DietsProps) {
         note: dietForm.note || undefined
       };
 
-      const response = await dailyDietApi.update(selectedDiet.id, requestData);
+      await dailyDietApi.update(selectedDiet.id, requestData);
 
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: 'Đã cập nhật thực đơn'
+        title: 'Success',
+        message: 'Updated diet plan'
       });
 
       setIsEditDietModalOpen(false);
       setSelectedDiet(null);
       resetDietForm();
-      // Update the diet in the list
-      setDiets(prev => prev.map(d => d.id === response.data.id ? response.data : d));
+      // Refresh current page
+      fetchDiets(currentPage);
     } catch (error: unknown) {
       console.error('Failed to update diet:', error);
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể cập nhật thực đơn'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to update diet plan'
       });
     } finally {
       setIsSubmitting(false);
@@ -423,34 +474,51 @@ function Diets({ userRole }: DietsProps) {
 
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: 'Đã xóa thực đơn'
+        title: 'Success',
+        message: 'Deleted diet plan'
       });
 
       setIsDeleteDietModalOpen(false);
       setSelectedDiet(null);
-      setDiets(prev => prev.filter(d => d.id !== selectedDiet.id));
+      // Refresh current page
+      fetchDiets(currentPage);
     } catch (error: unknown) {
       console.error('Failed to delete diet:', error);
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể xóa thực đơn'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to delete diet plan'
       });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleViewDiet = async (diet: ApiDailyDiet) => {
-    setSelectedDiet(diet);
-    await fetchDietDetails(diet.id);
-    setIsViewDietModalOpen(true);
+  const handleViewDiet = async (diet: ApiDietSummary) => {
+    try {
+      // Fetch full diet details with dietDetails array
+      const response = await dailyDietApi.getById(diet.id);
+      setSelectedDiet(response.data);
+      await fetchDietDetails(diet.id);
+      setIsViewDietModalOpen(true);
+    } catch (error) {
+      console.error('Failed to fetch diet details:', error);
+      showToast({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to load diet details'
+      });
+    }
   };
 
-  const openEditDietModal = (diet: ApiDailyDiet) => {
-    setSelectedDiet(diet);
+  const openEditDietModal = (diet: ApiDietSummary) => {
+    // Convert summary to full diet for editing
+    const fullDiet: ApiDailyDiet = {
+      ...diet,
+      dietDetails: []
+    };
+    setSelectedDiet(fullDiet);
     setDietForm({
       memberId: diet.memberId.toString(),
       ptId: diet.ptId.toString(),
@@ -461,8 +529,13 @@ function Diets({ userRole }: DietsProps) {
     setIsEditDietModalOpen(true);
   };
 
-  const openDeleteDietModal = (diet: ApiDailyDiet) => {
-    setSelectedDiet(diet);
+  const openDeleteDietModal = (diet: ApiDietSummary) => {
+    // Convert summary to full diet for deleting
+    const fullDiet: ApiDailyDiet = {
+      ...diet,
+      dietDetails: []
+    };
+    setSelectedDiet(fullDiet);
     setIsDeleteDietModalOpen(true);
   };
 
@@ -481,8 +554,8 @@ function Diets({ userRole }: DietsProps) {
     if (!selectedDiet || !dietDetailForm.foodId || !dietDetailForm.amount) {
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: 'Vui lòng chọn thực phẩm và số lượng'
+        title: 'Error',
+        message: 'Please select food and amount'
       });
       return;
     }
@@ -501,8 +574,8 @@ function Diets({ userRole }: DietsProps) {
 
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: 'Đã thêm thực phẩm vào thực đơn'
+        title: 'Success',
+        message: 'Added food to diet plan'
       });
 
       setIsAddFoodToDietModalOpen(false);
@@ -513,8 +586,8 @@ function Diets({ userRole }: DietsProps) {
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể thêm thực phẩm vào thực đơn'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to add food to diet plan'
       });
     } finally {
       setIsSubmitting(false);
@@ -536,8 +609,8 @@ function Diets({ userRole }: DietsProps) {
 
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: 'Đã cập nhật chi tiết thực phẩm'
+        title: 'Success',
+        message: 'Updated food detail'
       });
 
       setIsEditDietDetailModalOpen(false);
@@ -549,8 +622,8 @@ function Diets({ userRole }: DietsProps) {
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể cập nhật chi tiết'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to update food detail'
       });
     } finally {
       setIsSubmitting(false);
@@ -566,8 +639,8 @@ function Diets({ userRole }: DietsProps) {
 
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: 'Đã xóa thực phẩm khỏi thực đơn'
+        title: 'Success',
+        message: 'Removed food from diet plan'
       });
 
       setIsDeleteDietDetailModalOpen(false);
@@ -578,8 +651,8 @@ function Diets({ userRole }: DietsProps) {
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể xóa thực phẩm'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to remove food'
       });
     } finally {
       setIsSubmitting(false);
@@ -633,7 +706,7 @@ function Diets({ userRole }: DietsProps) {
         <div className="diets__header-actions">
           <button
             className="diets__refresh-btn"
-            onClick={fetchFoods}
+            onClick={activeTab === 'diets' ? () => fetchDiets(currentPage) : fetchFoods}
             disabled={isLoading}
             title="Refresh"
           >
@@ -867,6 +940,31 @@ function Diets({ userRole }: DietsProps) {
                 </div>
               </div>
             ))
+          )}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="diets__pagination">
+              <button 
+                className="diets__pagination-btn"
+                onClick={handlePrevPage}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft size={18} />
+                Previous
+              </button>
+              <span className="diets__pagination-info">
+                Page {currentPage} of {totalPages} ({totalItems} items)
+              </span>
+              <button 
+                className="diets__pagination-btn"
+                onClick={handleNextPage}
+                disabled={currentPage === totalPages}
+              >
+                Next
+                <ChevronRight size={18} />
+              </button>
+            </div>
           )}
         </div>
       )}

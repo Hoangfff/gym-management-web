@@ -94,8 +94,8 @@ function PersonalTrainers() {
       console.error('Failed to fetch trainers:', error);
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: 'Không thể tải danh sách PT'
+        title: 'Error',
+        message: 'Failed to load personal trainers'
       });
     } finally {
       setIsLoading(false);
@@ -213,8 +213,8 @@ function PersonalTrainers() {
     if (!formData.fullname || !formData.email || !formData.password || !formData.gender || !formData.dob || !formData.phoneNumber) {
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: 'Vui lòng điền đầy đủ thông tin bắt buộc'
+        title: 'Error',
+        message: 'Please fill in all required fields'
       });
       return;
     }
@@ -241,8 +241,8 @@ function PersonalTrainers() {
 
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: 'Đã thêm Personal Trainer mới'
+        title: 'Success',
+        message: 'Added new Personal Trainer'
       });
 
       setShowAddModal(false);
@@ -253,8 +253,8 @@ function PersonalTrainers() {
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể thêm PT'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to add personal trainer'
       });
     } finally {
       setIsSubmitting(false);
@@ -289,8 +289,8 @@ function PersonalTrainers() {
 
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: 'Đã cập nhật thông tin PT'
+        title: 'Success',
+        message: 'Updated personal trainer information'
       });
 
       setShowEditModal(false);
@@ -301,8 +301,8 @@ function PersonalTrainers() {
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể cập nhật thông tin'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to update personal trainer information'
       });
     } finally {
       setIsSubmitting(false);
@@ -318,8 +318,8 @@ function PersonalTrainers() {
 
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: `Đã xóa PT ${selectedTrainer.user.fullname}`
+        title: 'Success',
+        message: `Deleted PT ${selectedTrainer.user.fullname}`
       });
 
       setShowDeleteModal(false);
@@ -330,8 +330,8 @@ function PersonalTrainers() {
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể xóa PT'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to delete personal trainer'
       });
     } finally {
       setIsSubmitting(false);
@@ -343,8 +343,8 @@ function PersonalTrainers() {
       await ptApi.setBusy(trainer.id);
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: `${trainer.user.fullname} đã chuyển sang trạng thái Busy`
+        title: 'Success',
+        message: `${trainer.user.fullname} status changed to Busy`
       });
       fetchTrainers();
     } catch (error: unknown) {
@@ -352,8 +352,8 @@ function PersonalTrainers() {
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể thay đổi trạng thái'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to change status'
       });
     }
   };
@@ -363,8 +363,8 @@ function PersonalTrainers() {
       await ptApi.setAvailable(trainer.id);
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: `${trainer.user.fullname} đã chuyển sang trạng thái Available`
+        title: 'Success',
+        message: `${trainer.user.fullname} status changed to Available`
       });
       fetchTrainers();
     } catch (error: unknown) {
@@ -372,8 +372,8 @@ function PersonalTrainers() {
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể thay đổi trạng thái'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to change status'
       });
     }
   };

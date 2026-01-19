@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Plus, Pencil, Trash2, RefreshCw, Power, PowerOff, Eye, Search, Package, DollarSign, TrendingUp } from 'lucide-react';
+import { Plus, Pencil, Trash2, RefreshCw, Power, PowerOff, Eye, Search, Package, DollarSign, TrendingUp, ShoppingCart } from 'lucide-react';
 import Modal from '../../Modal/index.ts';
 import { ConfirmModal, useToast } from '../../../ui/index.ts';
-import { additionalServiceApi } from '../../../../services/index.ts';
-import type { ApiAdditionalService, ReqCreateAdditionalServiceDTO, ReqUpdateAdditionalServiceDTO } from '../../../../types/api.ts';
+import { additionalServiceApi, memberApi, invoiceApi } from '../../../../services/index.ts';
+import type { ApiAdditionalService, ReqCreateAdditionalServiceDTO, ReqUpdateAdditionalServiceDTO, ApiMember } from '../../../../types/api.ts';
 import './AdditionalServices.css';
 
 interface AdditionalServicesProps {
@@ -37,6 +37,7 @@ function AdditionalServices({ userRole }: AdditionalServicesProps) {
 
   // Data state
   const [services, setServices] = useState<ApiAdditionalService[]>([]);
+  const [members, setMembers] = useState<ApiMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -49,7 +50,17 @@ function AdditionalServices({ userRole }: AdditionalServicesProps) {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [selectedService, setSelectedService] = useState<ApiAdditionalService | null>(null);
+  
+  // Order form state
+  const [orderForm, setOrderForm] = useState({
+    memberId: 0,
+    quantity: 1,
+    discountAmount: 0,
+    paymentMethod: '',
+    notes: ''
+  });
 
   // Form state
   const [formData, setFormData] = useState({
@@ -62,8 +73,18 @@ function AdditionalServices({ userRole }: AdditionalServicesProps) {
   // Fetch data on mount
   useEffect(() => {
     fetchServices();
+    fetchMembers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const fetchMembers = async () => {
+    try {
+      const response = await memberApi.getAll();
+      setMembers(response.data || []);
+    } catch (error) {
+      console.error('Failed to fetch members:', error);
+    }
+  };
 
   const fetchServices = async () => {
     setIsLoading(true);
@@ -74,8 +95,8 @@ function AdditionalServices({ userRole }: AdditionalServicesProps) {
       console.error('Failed to fetch services:', error);
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: 'Không thể tải danh sách dịch vụ'
+        title: 'Error',
+        message: 'Failed to load services'
       });
     } finally {
       setIsLoading(false);
@@ -105,8 +126,8 @@ function AdditionalServices({ userRole }: AdditionalServicesProps) {
     if (!formData.name || !formData.costPrice || !formData.suggestSellPrice) {
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: 'Vui lòng điền đầy đủ thông tin bắt buộc'
+        title: 'Error',
+        message: 'Please fill in all required fields'
       });
       return;
     }
@@ -124,8 +145,8 @@ function AdditionalServices({ userRole }: AdditionalServicesProps) {
 
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: 'Đã thêm dịch vụ mới'
+        title: 'Success',
+        message: 'Service added successfully'
       });
 
       setIsAddModalOpen(false);
@@ -136,8 +157,8 @@ function AdditionalServices({ userRole }: AdditionalServicesProps) {
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể thêm dịch vụ'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to add service'
       });
     } finally {
       setIsSubmitting(false);
@@ -160,8 +181,8 @@ function AdditionalServices({ userRole }: AdditionalServicesProps) {
 
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: 'Đã cập nhật dịch vụ'
+        title: 'Success',
+        message: 'Service updated successfully'
       });
 
       setIsEditModalOpen(false);
@@ -173,8 +194,8 @@ function AdditionalServices({ userRole }: AdditionalServicesProps) {
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể cập nhật dịch vụ'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to update service'
       });
     } finally {
       setIsSubmitting(false);
@@ -190,8 +211,8 @@ function AdditionalServices({ userRole }: AdditionalServicesProps) {
 
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: `Đã xóa dịch vụ ${selectedService.name}`
+        title: 'Success',
+        message: `Service ${selectedService.name} deleted successfully`
       });
 
       setIsDeleteModalOpen(false);
@@ -202,8 +223,8 @@ function AdditionalServices({ userRole }: AdditionalServicesProps) {
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể xóa dịch vụ'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to delete service'
       });
     } finally {
       setIsSubmitting(false);
@@ -215,8 +236,8 @@ function AdditionalServices({ userRole }: AdditionalServicesProps) {
       await additionalServiceApi.activate(service.id);
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: `Đã kích hoạt dịch vụ ${service.name}`
+        title: 'Success',
+        message: `Service ${service.name} activated`
       });
       fetchServices();
     } catch (error: unknown) {
@@ -224,8 +245,8 @@ function AdditionalServices({ userRole }: AdditionalServicesProps) {
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể kích hoạt dịch vụ'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to activate service'
       });
     }
   };
@@ -235,8 +256,8 @@ function AdditionalServices({ userRole }: AdditionalServicesProps) {
       await additionalServiceApi.deactivate(service.id);
       showToast({
         type: 'success',
-        title: 'Thành công',
-        message: `Đã vô hiệu hóa dịch vụ ${service.name}`
+        title: 'Success',
+        message: `Service ${service.name} deactivated`
       });
       fetchServices();
     } catch (error: unknown) {
@@ -244,8 +265,8 @@ function AdditionalServices({ userRole }: AdditionalServicesProps) {
       const axiosError = error as { response?: { data?: { message?: string } } };
       showToast({
         type: 'error',
-        title: 'Lỗi',
-        message: axiosError.response?.data?.message || 'Không thể vô hiệu hóa dịch vụ'
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to deactivate service'
       });
     }
   };
@@ -269,6 +290,60 @@ function AdditionalServices({ userRole }: AdditionalServicesProps) {
   const openDeleteModal = (service: ApiAdditionalService) => {
     setSelectedService(service);
     setIsDeleteModalOpen(true);
+  };
+
+  const openOrderModal = (service: ApiAdditionalService) => {
+    setSelectedService(service);
+    setOrderForm({
+      memberId: 0,
+      quantity: 1,
+      discountAmount: 0,
+      paymentMethod: '',
+      notes: ''
+    });
+    setIsOrderModalOpen(true);
+  };
+
+  const handleOrderService = async () => {
+    if (!selectedService || !orderForm.memberId || !orderForm.paymentMethod) {
+      showToast({
+        type: 'error',
+        title: 'Error',
+        message: 'Please select a member and payment method'
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await invoiceApi.orderAdditionalService({
+        additionalServiceId: selectedService.id,
+        memberId: orderForm.memberId,
+        quantity: orderForm.quantity,
+        discountAmount: orderForm.discountAmount || undefined,
+        paymentMethod: orderForm.paymentMethod,
+        notes: orderForm.notes || undefined
+      });
+      
+      showToast({
+        type: 'success',
+        title: 'Success',
+        message: `Order for ${selectedService.name} created successfully`
+      });
+      
+      setIsOrderModalOpen(false);
+      setSelectedService(null);
+    } catch (error: unknown) {
+      console.error('Failed to order service:', error);
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      showToast({
+        type: 'error',
+        title: 'Error',
+        message: axiosError.response?.data?.message || 'Failed to create order'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const resetForm = () => {
@@ -435,6 +510,14 @@ function AdditionalServices({ userRole }: AdditionalServicesProps) {
                       </td>
                       <td>
                         <div className="additional-services__actions">
+                          <button
+                            className="additional-services__action-btn additional-services__action-btn--order"
+                            onClick={() => openOrderModal(service)}
+                            title="Order for Member"
+                            disabled={!service.isActive}
+                          >
+                            <ShoppingCart size={16} />
+                          </button>
                           <button
                             className="additional-services__action-btn"
                             onClick={() => handleViewService(service)}
@@ -740,6 +823,134 @@ function AdditionalServices({ userRole }: AdditionalServicesProps) {
         variant="danger"
         isLoading={isSubmitting}
       />
+
+      {/* Order Service Modal */}
+      <Modal
+        isOpen={isOrderModalOpen}
+        onClose={() => { setIsOrderModalOpen(false); setSelectedService(null); }}
+        title="Order Additional Service"
+      >
+        {selectedService && (
+          <form className="modal-form" onSubmit={(e) => { e.preventDefault(); handleOrderService(); }}>
+            <div className="additional-services__order-info">
+              <Package size={20} />
+              <div>
+                <h4>{selectedService.name}</h4>
+                <p>{formatCurrency(selectedService.suggestSellPrice)} per unit</p>
+              </div>
+            </div>
+
+            <div className="modal-form__group">
+              <label className="modal-form__label modal-form__label--required">Member</label>
+              <select
+                className="modal-form__select"
+                value={orderForm.memberId}
+                onChange={(e) => setOrderForm({ ...orderForm, memberId: Number(e.target.value) })}
+                required
+              >
+                <option value={0}>-- Select Member --</option>
+                {members.map(member => (
+                  <option key={member.id} value={member.id}>
+                    {member.user.fullname} (ID: {member.id})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="modal-form__row">
+              <div className="modal-form__group">
+                <label className="modal-form__label modal-form__label--required">Quantity</label>
+                <input
+                  type="number"
+                  className="modal-form__input"
+                  value={orderForm.quantity}
+                  onChange={(e) => setOrderForm({ ...orderForm, quantity: Number(e.target.value) })}
+                  min={1}
+                  required
+                />
+              </div>
+              <div className="modal-form__group">
+                <label className="modal-form__label">Discount (VND)</label>
+                <input
+                  type="number"
+                  className="modal-form__input"
+                  value={orderForm.discountAmount}
+                  onChange={(e) => setOrderForm({ ...orderForm, discountAmount: Number(e.target.value) })}
+                  min={0}
+                />
+              </div>
+            </div>
+
+            <div className="modal-form__group">
+              <label className="modal-form__label modal-form__label--required">Payment Method</label>
+              <select
+                className="modal-form__select"
+                value={orderForm.paymentMethod}
+                onChange={(e) => setOrderForm({ ...orderForm, paymentMethod: e.target.value })}
+                required
+              >
+                <option value="">-- Select Method --</option>
+                <option value="CASH">Cash</option>
+                <option value="BANK_TRANSFER">Bank Transfer</option>
+                <option value="CREDIT_CARD">Credit Card</option>
+                <option value="MOMO">MoMo</option>
+                <option value="VNPAY">VNPay</option>
+              </select>
+            </div>
+
+            <div className="modal-form__group">
+              <label className="modal-form__label">Notes</label>
+              <textarea
+                className="modal-form__textarea"
+                value={orderForm.notes}
+                onChange={(e) => setOrderForm({ ...orderForm, notes: e.target.value })}
+                rows={2}
+                placeholder="Optional notes..."
+              />
+            </div>
+
+            {/* Order Summary */}
+            <div className="additional-services__order-summary">
+              <div className="additional-services__order-summary-row">
+                <span>Unit Price:</span>
+                <span>{formatCurrency(selectedService.suggestSellPrice)}</span>
+              </div>
+              <div className="additional-services__order-summary-row">
+                <span>Quantity:</span>
+                <span>x{orderForm.quantity}</span>
+              </div>
+              {orderForm.discountAmount > 0 && (
+                <div className="additional-services__order-summary-row">
+                  <span>Discount:</span>
+                  <span className="additional-services__discount">-{formatCurrency(orderForm.discountAmount)}</span>
+                </div>
+              )}
+              <div className="additional-services__order-summary-row additional-services__order-summary-row--total">
+                <span>Total:</span>
+                <strong>{formatCurrency((selectedService.suggestSellPrice * orderForm.quantity) - (orderForm.discountAmount || 0))}</strong>
+              </div>
+            </div>
+
+            <div className="modal-form__actions">
+              <button
+                type="button"
+                className="modal-form__btn modal-form__btn--secondary"
+                onClick={() => { setIsOrderModalOpen(false); setSelectedService(null); }}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="modal-form__btn modal-form__btn--primary"
+                disabled={isSubmitting || !orderForm.memberId || !orderForm.paymentMethod}
+              >
+                {isSubmitting ? 'Processing...' : 'Create Order'}
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
     </div>
   );
 }

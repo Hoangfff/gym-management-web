@@ -46,14 +46,19 @@ export interface ReqLoginDTO {
 
 export interface AuthUser {
   id: number;
-  username: string;
-  role: RoleEnum;
+  email: string;
+  name: string;
+}
+
+export interface AuthRole {
+  roleId: number;
+  roleName: string;
 }
 
 export interface LoginResponse {
-  token: string;
-  expiresIn: number;
   user: AuthUser;
+  role: AuthRole;
+  access_token: string;
 }
 
 export interface AccountInfo {
@@ -396,6 +401,20 @@ export interface ApiDietDetail {
   updatedAt: string | null;
 }
 
+// Diet summary (without details) - used in getAll list
+export interface ApiDietSummary {
+  id: number;
+  memberId: number;
+  memberName: string;
+  ptId: number;
+  ptName: string;
+  dietDate: string;
+  waterLiters: number;
+  note: string;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
 export interface ApiDailyDiet {
   id: number;
   memberId: number;
@@ -564,6 +583,15 @@ export interface ReqCreateContractDTO {
   notes?: string;
 }
 
+export interface ReqUpdateContractDTO {
+  packageId?: number;
+  ptId?: number;
+  startDate?: string; // YYYY-MM-DD
+  endDate?: string; // YYYY-MM-DD
+  totalSessions?: number;
+  notes?: string;
+}
+
 // ===== Booking Types =====
 
 export type BookingStatusEnum = 'CONFIRMED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW';
@@ -662,12 +690,14 @@ export interface ReqUpdateAvailableSlotDTO {
   status: AvailableSlotStatusEnum;
 }
 
-// ===== Invoice Types =====
+// ===== Invoice Types (Updated to match actual API) =====
 
-export type InvoiceStatusEnum = 'DRAFT' | 'PENDING' | 'PARTIAL' | 'PAID' | 'OVERDUE' | 'CANCELLED';
+export type InvoicePaymentStatusEnum = 'UNPAID' | 'PAID' | 'PARTIAL';
+export type InvoiceStatusEnum = 'DRAFT' | 'ISSUED' | 'PENDING' | 'PARTIAL' | 'PAID' | 'OVERDUE' | 'CANCELLED';
 
 export const InvoiceStatus = {
   DRAFT: 'DRAFT' as InvoiceStatusEnum,
+  ISSUED: 'ISSUED' as InvoiceStatusEnum,
   PENDING: 'PENDING' as InvoiceStatusEnum,
   PARTIAL: 'PARTIAL' as InvoiceStatusEnum,
   PAID: 'PAID' as InvoiceStatusEnum,
@@ -675,36 +705,42 @@ export const InvoiceStatus = {
   CANCELLED: 'CANCELLED' as InvoiceStatusEnum
 };
 
-export interface InvoiceItem {
-  id: number;
-  description: string;
+export interface InvoiceDetail {
+  detailId: number;
+  invoiceId: number;
+  servicePackageId: number | null;
+  servicePackageName: string | null;
+  additionalServiceId: number | null;
+  additionalServiceName: string | null;
   quantity: number;
   unitPrice: number;
-  amount: number;
-}
-
-export interface PaymentHistoryItem {
-  date: string;
-  amount: number;
-  method: string;
+  totalAmount: number;
+  createdAt: string;
 }
 
 export interface ApiInvoice {
-  id: number;
+  invoiceId: number;
   memberId: number;
   memberName: string;
-  invoiceDate: string;
-  dueDate: string;
+  totalAmount: number;
+  discountAmount: number;
+  finalAmount: number;
+  paymentMethod: string;
+  paymentStatus: InvoicePaymentStatusEnum;
   status: InvoiceStatusEnum;
-  subtotal: number;
-  tax: number;
-  total: number;
-  paid: number;
-  remaining: number;
-  items: InvoiceItem[];
+  details: InvoiceDetail[];
+  createdAt: string;
+  updatedAt: string | null;
+  createdBy: string;
+}
+
+export interface ReqOrderAdditionalServiceDTO {
+  additionalServiceId: number;
+  memberId: number;
+  quantity: number;
+  discountAmount?: number;
+  paymentMethod: string;
   notes?: string;
-  lastPaymentDate?: string;
-  paymentHistory?: PaymentHistoryItem[];
 }
 
 export interface ReqAddServiceToInvoiceDTO {
@@ -714,8 +750,43 @@ export interface ReqAddServiceToInvoiceDTO {
 }
 
 export interface ReqUpdatePaymentStatusDTO {
-  amountPaid: number;
-  paymentMethod: string;
-  paymentDate: string;
+  paymentStatus: 'UNPAID' | 'PAID' | 'PARTIAL';
+  amountPaid?: number;
+  paymentMethod?: string;
+  paymentDate?: string;
   notes?: string;
+}
+
+// ===== Check-in Types =====
+
+export type CheckInStatusEnum = 'CHECKED_IN' | 'CHECKED_OUT' | 'CANCELLED' | 'NO_SHOW';
+
+export const CheckInStatus = {
+  CHECKED_IN: 'CHECKED_IN' as CheckInStatusEnum,
+  CHECKED_OUT: 'CHECKED_OUT' as CheckInStatusEnum,
+  CANCELLED: 'CANCELLED' as CheckInStatusEnum,
+  NO_SHOW: 'NO_SHOW' as CheckInStatusEnum
+};
+
+export interface ApiCheckIn {
+  checkinId: number;
+  bookingId: number;
+  memberId: number;
+  memberName: string;
+  checkinTime: string;
+  checkoutTime: string | null;
+  status: CheckInStatusEnum;
+  createdBy: string;
+}
+
+export interface ReqCheckInDTO {
+  bookingId: number;
+}
+
+export interface ReqCheckOutDTO {
+  notes?: string;
+}
+
+export interface ReqCancelCheckInDTO {
+  reason?: string;
 }

@@ -22,6 +22,84 @@
   margin: var(--spacing-xs) 0 0;
 }
 
+/* Filters */
+.bookings__filters {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--spacing-lg);
+  background-color: var(--color-white);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-radius: var(--radius-lg);
+}
+
+.bookings__search {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex: 1;
+  max-width: 400px;
+  background: var(--color-gray-100);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+}
+
+.bookings__search svg {
+  color: var(--color-gray-400);
+  flex-shrink: 0;
+}
+
+.bookings__search input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: var(--font-size-sm);
+  color: var(--color-dashboard-text);
+  outline: none;
+  font-family: var(--font-primary);
+}
+
+.bookings__search input::placeholder {
+  color: var(--color-gray-400);
+}
+
+.bookings__filter-group {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.bookings__select-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.bookings__select-wrapper select {
+  appearance: none;
+  background: var(--color-white);
+  border: 1px solid var(--color-gray-200);
+  padding: var(--spacing-sm) var(--spacing-3xl) var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-primary);
+  color: var(--color-dashboard-text);
+  cursor: pointer;
+  min-width: 150px;
+}
+
+.bookings__select-wrapper select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.bookings__select-wrapper svg {
+  position: absolute;
+  right: var(--spacing-sm);
+  color: var(--color-gray-400);
+  pointer-events: none;
+}
+
 .bookings__create-btn {
   display: flex;
   align-items: center;
@@ -565,4 +643,139 @@
   margin: 0 0 var(--spacing-sm) 0;
   font-size: var(--font-size-sm);
   color: var(--color-gray-500);
+}
+
+/* Check-in Status Badges */
+.booking-card__header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.booking-card__checkin-status {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  border-radius: var(--radius-full);
+}
+
+.checkin-status--checked-in {
+  background-color: #dcfce7;
+  color: #16a34a;
+}
+
+.checkin-status--checked-out {
+  background-color: #dbeafe;
+  color: #2563eb;
+}
+
+.checkin-status--cancelled {
+  background-color: #fee2e2;
+  color: #dc2626;
+}
+
+.checkin-status--no-show {
+  background-color: #f3f4f6;
+  color: #6b7280;
+}
+
+/* Check-in/Check-out info rows */
+.booking-card__info-row--checkin {
+  color: #16a34a;
+}
+
+.booking-card__info-row--checkout {
+  color: #2563eb;
+}
+
+/* Check-in Actions */
+.booking-card__checkin-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-md);
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.booking-card__btn--checkin {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  background-color: #16a34a;
+  color: var(--color-white);
+  border: none;
+}
+
+.booking-card__btn--checkin:hover:not(:disabled) {
+  background-color: #15803d;
+}
+
+.booking-card__btn--checkout {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  background-color: #2563eb;
+  color: var(--color-white);
+  border: none;
+}
+
+.booking-card__btn--checkout:hover:not(:disabled) {
+  background-color: #1d4ed8;
+}
+
+.booking-card__btn--cancel-checkin {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  background-color: transparent;
+  color: #dc2626;
+  border: 1px solid #dc2626;
+}
+
+.booking-card__btn--cancel-checkin:hover:not(:disabled) {
+  background-color: #fee2e2;
+}
+
+.booking-card__btn--view-history {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  background-color: transparent;
+  color: var(--color-gray-600);
+  border: 1px solid var(--color-gray-300);
+}
+
+.booking-card__btn--view-history:hover:not(:disabled) {
+  background-color: var(--color-gray-100);
+  border-color: var(--color-gray-400);
+}
+
+.booking-card__btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Modal Form Info */
+.modal-form__info {
+  background-color: var(--color-gray-100);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.modal-form__info p {
+  margin: var(--spacing-xs) 0;
+  font-size: var(--font-size-sm);
+}
+
+.modal-form__btn--danger {
+  background-color: #dc2626;
+  color: var(--color-white);
+  border: none;
+}
+
+.modal-form__btn--danger:hover:not(:disabled) {
+  background-color: #b91c1c;
 }

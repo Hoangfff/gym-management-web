@@ -27,6 +27,7 @@ import type {
   ReqUpdateFoodDTO,
   FoodTypeEnum,
   ApiDailyDiet,
+  ApiDietSummary,
   ReqCreateDailyDietDTO,
   ReqUpdateDailyDietDTO,
   ApiDietDetail,
@@ -42,6 +43,7 @@ import type {
   ReqUpdateWorkoutDeviceDTO,
   ApiContract,
   ReqCreateContractDTO,
+  ReqUpdateContractDTO,
   ContractStatusEnum,
   // Auth types
   ReqLoginDTO,
@@ -62,6 +64,10 @@ import type {
   ApiInvoice,
   ReqAddServiceToInvoiceDTO,
   ReqUpdatePaymentStatusDTO,
+  ReqOrderAdditionalServiceDTO,
+  // Check-in types
+  ApiCheckIn,
+  ReqCheckInDTO,
 } from '../types/api.ts';
 
 // ===== Axios Instance Configuration =====
@@ -80,7 +86,7 @@ export const apiClient = axios.create({
 apiClient.interceptors.request.use(
   (config) => {
     // Add auth token if available
-    const token = localStorage.getItem('authToken');
+    const token = localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -98,7 +104,8 @@ apiClient.interceptors.response.use(
     // Handle common errors
     if (error.response?.status === 401) {
       // Unauthorized - redirect to login
-      localStorage.removeItem('authToken');
+      localStorage.removeItem('accessToken');
+      sessionStorage.removeItem('accessToken');
       // window.location.href = '/login';
     }
     return Promise.reject(error);
@@ -485,7 +492,15 @@ export const foodApi = {
 // ===== Daily Diet API =====
 
 export const dailyDietApi = {
-  // Get diet by ID
+  // Get all diets with pagination (without details)
+  getAll: async (page: number = 1, size: number = 20): Promise<ApiResponse<ResultPaginationDTO<ApiDietSummary>>> => {
+    const response = await apiClient.get<ApiResponse<ResultPaginationDTO<ApiDietSummary>>>('/api/v1/daily-diets', {
+      params: { page, size }
+    });
+    return response.data;
+  },
+
+  // Get diet by ID (with details)
   getById: async (id: number): Promise<ApiResponse<ApiDailyDiet>> => {
     const response = await apiClient.get<ApiResponse<ApiDailyDiet>>(`/api/v1/daily-diets/${id}`);
     return response.data;
@@ -541,9 +556,11 @@ export const dietDetailApi = {
 // ===== Workout API =====
 
 export const workoutApi = {
-  // Get all workouts
-  getAll: async (): Promise<ApiResponse<ApiWorkout[]>> => {
-    const response = await apiClient.get<ApiResponse<ApiWorkout[]>>('/api/v1/workouts');
+  // Get all workouts with pagination
+  getAll: async (page: number = 1, size: number = 20): Promise<ApiResponse<ResultPaginationDTO<ApiWorkout>>> => {
+    const response = await apiClient.get<ApiResponse<ResultPaginationDTO<ApiWorkout>>>('/api/v1/workouts', {
+      params: { page, size }
+    });
     return response.data;
   },
 
@@ -611,9 +628,11 @@ export const workoutApi = {
 // ===== Workout Device API =====
 
 export const workoutDeviceApi = {
-  // Get all workout devices
-  getAll: async (): Promise<ApiResponse<ApiWorkoutDevice[]>> => {
-    const response = await apiClient.get<ApiResponse<ApiWorkoutDevice[]>>('/api/v1/workout-devices');
+  // Get all workout devices with pagination
+  getAll: async (page: number = 1, size: number = 20): Promise<ApiResponse<ResultPaginationDTO<ApiWorkoutDevice>>> => {
+    const response = await apiClient.get<ApiResponse<ResultPaginationDTO<ApiWorkoutDevice>>>('/api/v1/workout-devices', {
+      params: { page, size }
+    });
     return response.data;
   },
 
@@ -738,6 +757,21 @@ export const contractApi = {
       ...response.data,
       data: response.data.data?.data || response.data.data
     } as ApiResponse<ApiContract>;
+  },
+
+  // Update contract
+  update: async (id: number, data: ReqUpdateContractDTO): Promise<ApiResponse<ApiContract>> => {
+    const response = await apiClient.put<ApiResponse<{ data: ApiContract }>>(`/api/v1/contracts/${id}`, data);
+    return {
+      ...response.data,
+      data: response.data.data?.data || response.data.data
+    } as ApiResponse<ApiContract>;
+  },
+
+  // Delete contract
+  delete: async (id: number): Promise<ApiResponse<null>> => {
+    const response = await apiClient.delete<ApiResponse<null>>(`/api/v1/contracts/${id}`);
+    return response.data;
   },
 };
 
@@ -864,6 +898,12 @@ export const availableSlotApi = {
     return response.data;
   },
 
+  // Get my available slots (for logged-in PT user)
+  getMyAvailableSlots: async (): Promise<ApiResponse<ApiResponse<ApiPtAvailableSlot[]>>> => {
+    const response = await apiClient.get<ApiResponse<ApiResponse<ApiPtAvailableSlot[]>>>('/api/v1/available-slots/my-available-slots');
+    return response.data;
+  },
+
   // Get slots by status
   getByStatus: async (status: AvailableSlotStatusEnum, params?: {
     page?: number;
@@ -897,11 +937,16 @@ export const availableSlotApi = {
 export const invoiceApi = {
   // Get invoice by ID
   getById: async (id: number): Promise<ApiResponse<ApiInvoice>> => {
-    const response = await apiClient.get<ApiResponse<ApiInvoice>>(`/api/v1/invoices/${id}`);
-    return response.data;
+    const response = await apiClient.get<ApiResponse<{ data: ApiInvoice }>>(`/api/v1/invoices/${id}`);
+    // Handle nested data.data structure
+    const nestedData = response.data.data as unknown as { data?: ApiInvoice };
+    return {
+      ...response.data,
+      data: nestedData?.data || response.data.data
+    } as ApiResponse<ApiInvoice>;
   },
 
-  // Get invoices by member
+  // Get invoices by member - handles nested data.data structure
   getByMemberId: async (memberId: number, params?: {
     status?: string;
     startDate?: string;
@@ -909,8 +954,24 @@ export const invoiceApi = {
     page?: number;
     size?: number;
   }): Promise<ApiResponse<ApiInvoice[]>> => {
-    const response = await apiClient.get<ApiResponse<ApiInvoice[]>>(`/api/v1/invoices/member/${memberId}`, { params });
-    return response.data;
+    const response = await apiClient.get<ApiResponse<{ data: ApiInvoice[] }>>(`/api/v1/invoices/member/${memberId}`, { params });
+    // Handle nested data.data structure from API
+    const nestedData = response.data.data as unknown as { data?: ApiInvoice[] };
+    return {
+      ...response.data,
+      data: nestedData?.data || response.data.data || []
+    } as ApiResponse<ApiInvoice[]>;
+  },
+
+  // Order additional service for member
+  orderAdditionalService: async (data: ReqOrderAdditionalServiceDTO): Promise<ApiResponse<ApiInvoice>> => {
+    const response = await apiClient.post<ApiResponse<{ data: ApiInvoice }>>('/api/v1/invoices/additional-service', data);
+    // Handle nested data.data structure
+    const nestedData = response.data.data as unknown as { data?: ApiInvoice };
+    return {
+      ...response.data,
+      data: nestedData?.data || response.data.data
+    } as ApiResponse<ApiInvoice>;
   },
 
   // Add service to invoice
@@ -921,8 +982,45 @@ export const invoiceApi = {
 
   // Update payment status
   updatePaymentStatus: async (id: number, data: ReqUpdatePaymentStatusDTO): Promise<ApiResponse<ApiInvoice>> => {
-    const response = await apiClient.put<ApiResponse<ApiInvoice>>(`/api/v1/invoices/${id}/payment-status`, data);
+    const { paymentStatus, ...bodyData } = data;
+    const response = await apiClient.put<ApiResponse<ApiInvoice>>(
+      `/api/v1/invoices/${id}/payment-status?paymentStatus=${paymentStatus}`,
+      bodyData
+    );
     return response.data;
+  },
+};
+
+// ===== Check-in API =====
+
+export const checkInApi = {
+  // Check-in member to a booking
+  checkIn: async (data: ReqCheckInDTO): Promise<ApiResponse<ApiCheckIn>> => {
+    const response = await apiClient.post<ApiResponse<ApiResponse<ApiCheckIn>>>('/api/v1/checkins', data);
+    // Handle nested response: response.data.data.data
+    const nestedData = response.data.data as unknown as ApiResponse<ApiCheckIn>;
+    return nestedData;
+  },
+
+  // Check-out member by bookingId
+  checkOut: async (bookingId: number): Promise<ApiResponse<ApiCheckIn>> => {
+    const response = await apiClient.put<ApiResponse<ApiResponse<ApiCheckIn>>>(`/api/v1/checkins/checkout/${bookingId}`);
+    const nestedData = response.data.data as unknown as ApiResponse<ApiCheckIn>;
+    return nestedData;
+  },
+
+  // Cancel check-in by bookingId
+  cancel: async (bookingId: number): Promise<ApiResponse<ApiCheckIn>> => {
+    const response = await apiClient.put<ApiResponse<ApiResponse<ApiCheckIn>>>(`/api/v1/checkins/cancel/${bookingId}`);
+    const nestedData = response.data.data as unknown as ApiResponse<ApiCheckIn>;
+    return nestedData;
+  },
+
+  // Get check-ins by booking ID (returns array)
+  getByBookingId: async (bookingId: number): Promise<ApiResponse<ApiCheckIn[]>> => {
+    const response = await apiClient.get<ApiResponse<ApiResponse<ApiCheckIn[]>>>(`/api/v1/checkins/booking/${bookingId}`);
+    const nestedData = response.data.data as unknown as ApiResponse<ApiCheckIn[]>;
+    return nestedData;
   },
 };
 
@@ -943,4 +1041,5 @@ export default {
   bookingApi,
   availableSlotApi,
   invoiceApi,
+  checkInApi,
 };
