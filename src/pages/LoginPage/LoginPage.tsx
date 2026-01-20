@@ -68,6 +68,7 @@ function LoginPage() {
         storage.setItem('accessToken', access_token);
         storage.setItem('user', JSON.stringify(user));
         storage.setItem('role', JSON.stringify(role));
+        storage.setItem('userId', user.id.toString());
 
         // Handle remember me for credentials
         if (formData.rememberMe) {

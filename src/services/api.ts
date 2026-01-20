@@ -57,8 +57,11 @@ import type {
   // Available Slot types
   ApiAvailableSlot,
   ApiPtAvailableSlot,
+  ApiUserAvailableSlot,
   ReqCreateAvailableSlotDTO,
   ReqUpdateAvailableSlotDTO,
+  ReqCreateMyAvailableSlotDTO,
+  ReqUpdateUserAvailableSlotDTO,
   AvailableSlotStatusEnum,
   // Invoice types
   ApiInvoice,
@@ -901,6 +904,42 @@ export const availableSlotApi = {
   // Get my available slots (for logged-in PT user)
   getMyAvailableSlots: async (): Promise<ApiResponse<ApiResponse<ApiPtAvailableSlot[]>>> => {
     const response = await apiClient.get<ApiResponse<ApiResponse<ApiPtAvailableSlot[]>>>('/api/v1/available-slots/my-available-slots');
+    return response.data;
+  },
+
+  // Get available slots by user ID (only available)
+  getAvailableByUserId: async (userId: number): Promise<ApiResponse<ApiUserAvailableSlot[]>> => {
+    const response = await apiClient.get<ApiResponse<ApiUserAvailableSlot[]>>(`/api/v1/available-slots/user/${userId}/available`);
+    return response.data;
+  },
+
+  // Get all slots by user ID (including unavailable) - assumes endpoint exists
+  getAllSlotsByUserId: async (userId: number): Promise<ApiResponse<ApiUserAvailableSlot[]>> => {
+    const response = await apiClient.get<ApiResponse<ApiUserAvailableSlot[]>>(`/api/v1/available-slots/user/${userId}`);
+    return response.data;
+  },
+
+  // Create new available slot for current logged-in user
+  createMySlot: async (data: ReqCreateMyAvailableSlotDTO): Promise<ApiResponse<ApiUserAvailableSlot>> => {
+    const response = await apiClient.post<ApiResponse<ApiUserAvailableSlot>>('/api/v1/available-slots/user/my-slot', data);
+    return response.data;
+  },
+
+  // Update available slot (user-based)
+  updateUserSlot: async (id: number, data: ReqUpdateUserAvailableSlotDTO): Promise<ApiResponse<ApiUserAvailableSlot>> => {
+    const response = await apiClient.put<ApiResponse<ApiUserAvailableSlot>>(`/api/v1/available-slots/${id}`, data);
+    return response.data;
+  },
+
+  // Set available slot as unavailable
+  setUnavailable: async (id: number): Promise<ApiResponse<ApiUserAvailableSlot>> => {
+    const response = await apiClient.put<ApiResponse<ApiUserAvailableSlot>>(`/api/v1/available-slots/${id}/set-unavailable`);
+    return response.data;
+  },
+
+  // Set available slot as available
+  setAvailable: async (id: number): Promise<ApiResponse<ApiUserAvailableSlot>> => {
+    const response = await apiClient.put<ApiResponse<ApiUserAvailableSlot>>(`/api/v1/available-slots/${id}/set-available`);
     return response.data;
   },
 

@@ -679,6 +679,32 @@ export interface ApiPtAvailableSlot {
   updatedBy: string;
 }
 
+// User-based Available Slot (from GET /api/v1/available-slots/user/{userId}/available)
+export interface AvailableSlotUser {
+  userId: number;
+  userName: string;
+  userFullname: string;
+}
+
+export interface AvailableSlotInfo {
+  slotId: number;
+  slotName: string;
+  startTime: string; // HH:mm:ss
+  endTime: string; // HH:mm:ss
+}
+
+export interface ApiUserAvailableSlot {
+  id: number;
+  user: AvailableSlotUser;
+  slot: AvailableSlotInfo;
+  dayOfWeek: DayOfWeekEnum;
+  isAvailable: boolean;
+  createdAt: string;
+  updatedAt: string | null;
+  createdBy: string;
+  updatedBy: string | null;
+}
+
 export interface ReqCreateAvailableSlotDTO {
   ptId: number;
   slotId: number;
@@ -688,6 +714,17 @@ export interface ReqCreateAvailableSlotDTO {
 
 export interface ReqUpdateAvailableSlotDTO {
   status: AvailableSlotStatusEnum;
+}
+
+// New DTOs for user-based available slot APIs
+export interface ReqCreateMyAvailableSlotDTO {
+  slotId: number;
+  dayOfWeek: DayOfWeekEnum;
+}
+
+export interface ReqUpdateUserAvailableSlotDTO {
+  slotId: number;
+  dayOfWeek: DayOfWeekEnum;
 }
 
 // ===== Invoice Types (Updated to match actual API) =====
